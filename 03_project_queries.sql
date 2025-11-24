@@ -72,9 +72,11 @@ WHERE M.name = 'Kim Cheol-Su';
 -- Based on the CURRENT_DATE (2025-11-24)
 ---------------------------------------------------------
 SELECT name,
-       phone,
-       expiry_date
+phone,
+expiry_date
+FROM Member
+WHERE expiry_date = (
+SELECT MIN(expiry_date)
 FROM Member
 WHERE expiry_date >= CURRENT_DATE
-ORDER BY expiry_date
-FETCH FIRST 1 ROWS ONLY;
+);
