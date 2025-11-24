@@ -1,5 +1,5 @@
 # 🏋️‍♂️ Fitness Center Management System
-**60212184 — Gwangmin Park**
+**Gwangmin Park**
 
 ---
 
@@ -152,7 +152,7 @@ amount, payment_date, method, category
 ---
 
 ## 📎 ER Diagram
-(Insert ERD image here – or keep as is)
+<img width="1274" height="717" alt="image" src="https://github.com/user-attachments/assets/cbc83050-72ff-4657-82a0-bc232f7cf6ba" />
 
 ---
 
