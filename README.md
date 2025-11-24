@@ -166,6 +166,11 @@ SQL (DDL, DML, JOIN, Subquery)
 
 Git / GitHub
 
+
+## 🎬 Demonstration Video (Korean Version)
+[![Demo Video](https://img.youtube.com/vi/XsdbgZr0mJI/0.jpg)](https://www.youtube.com/watch?v=XsdbgZr0mJI)
+
+
 👤 Author
 
 Gwangmin
