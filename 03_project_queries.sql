@@ -92,7 +92,7 @@ SELECT
     COUNT(DISTINCT S.member_id) AS total_members
 FROM Trainer AS T
 LEFT JOIN PT_Session AS S
-    ON T.trainer_id = S.trainer_id
+ON T.trainer_id = S.trainer_id
     AND S.status = 'COMPLETED'
 GROUP BY T.trainer_id, T.name, T.specialty
 ORDER BY completed_sessions DESC;
@@ -108,5 +108,5 @@ SELECT
     remaining_pt_count
 FROM Member
 WHERE remaining_pt_count <= 3
-AND expiry_date >= SYSDATE
+    AND expiry_date >= SYSDATE
 ORDER BY remaining_pt_count ASC, expiry_date ASC;

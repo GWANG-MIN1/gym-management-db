@@ -58,10 +58,10 @@ CREATE TABLE PT_Session (
     session_date DATE NOT NULL,
     session_time VARCHAR2(5) NOT NULL CHECK (REGEXP_LIKE(session_time, '^\d{2}:\d{2}$')),
     status VARCHAR2(20) NOT NULL DEFAULT 'SCHEDULED'
-        CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED')),
+    CHECK (status IN ('SCHEDULED', 'COMPLETED', 'CANCELLED')),
     created_at DATE DEFAULT SYSDATE,
-    FOREIGN KEY (member_id) REFERENCES Member(member_id) ON DELETE CASCADE,
-    FOREIGN KEY (trainer_id) REFERENCES Trainer(trainer_id),
+    FOREIGN KEY (member_id) REFERENCES Member (member_id) ON DELETE CASCADE,
+    FOREIGN KEY (trainer_id) REFERENCES Trainer (trainer_id),
     UNIQUE (trainer_id, session_date, session_time)
 );
 
@@ -104,7 +104,7 @@ CREATE INDEX idx_pt_session_date ON PT_Session(session_date);
 CREATE INDEX idx_workout_member ON Workout_Log(member_id);
 CREATE INDEX idx_workout_date ON Workout_Log(log_date);
 CREATE INDEX idx_payment_member ON Payment(member_id);
-CREATE INDEX idx_member_expiry ON Member(expiry_date);
+CREATE INDEX idx_member_expiry ON Member (expiry_date);
 
 ---------------------------------------------------------
 -- Trigger: PT 세션 완료 시 remaining_pt_count 자동 차감
