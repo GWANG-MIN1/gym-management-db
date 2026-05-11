@@ -164,7 +164,53 @@ Oracle Database XE
 
 SQL (DDL, DML, JOIN, Subquery)
 
+Docker / Docker Compose
+
+GitHub Actions (SQL Lint CI)
+
 Git / GitHub
+
+---
+
+## 🐳 로컬 실행 (Docker)
+
+Oracle XE 환경을 Docker로 한 번에 실행할 수 있습니다.
+
+```bash
+docker compose up -d
+```
+
+- Oracle XE 21c 컨테이너가 시작되며 스키마와 샘플 데이터가 자동으로 초기화됩니다.
+- 최초 실행 시 초기화에 약 2~3분 소요됩니다.
+
+**접속 정보**
+
+| 항목 | 값 |
+|------|-----|
+| Host | localhost |
+| Port | 1521 |
+| User | gymuser |
+| Password | gymuser123 |
+| SID | XE |
+
+**컨테이너 종료**
+```bash
+docker compose down        # 컨테이너만 종료 (데이터 유지)
+docker compose down -v     # 컨테이너 + 볼륨 삭제
+```
+
+---
+
+## ✅ CI — SQL Lint (GitHub Actions)
+
+`.sql` 파일이 변경되어 push 또는 PR이 생성되면 **sqlfluff**가 자동으로 SQL 문법을 검사합니다.
+
+```
+.sql 파일 변경 push / PR
+  └─ lint.yml : sqlfluff lint *.sql --dialect oracle
+```
+
+![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
 
 
 ## 🎬 Demonstration Video (Korean Version)

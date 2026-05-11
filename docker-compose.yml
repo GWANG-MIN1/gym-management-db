@@ -1,0 +1,24 @@
+services:
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: gym-management-db
+    environment:
+      ORACLE_PASSWORD: gymadmin123
+      APP_USER: gymuser
+      APP_USER_PASSWORD: gymuser123
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./01_create_tables.sql:/container-entrypoint-initdb.d/01_create_tables.sql
+      - ./02_insert_sample_data.sql:/container-entrypoint-initdb.d/02_insert_sample_data.sql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 3m
+    restart: unless-stopped
+
+volumes:
+  oracle_data:
