@@ -1,174 +1,42 @@
-# 🏋️‍♂️ Fitness Center Management System
-**Gwangmin Park**
+# 🏋️‍♂️ 피트니스 센터 관리 시스템
+
+**박광민**
+
+![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
 
 ---
 
-## 📌 Project Overview
-This project aims to design a database system capable of managing **gym members, PT (Personal Training) reservations, and workout logs**.
+## 📌 프로젝트 개요
 
-The system stores and manages various types of data generated in a fitness center, such as:
-- Member information  
-- Trainer assignments  
-- PT reservation schedules  
-- Workout records  
-- Payment information  
+피트니스 센터에서 발생하는 다양한 데이터를 효율적으로 관리하기 위한 데이터베이스 시스템입니다.
 
-To support efficient management, an **E-R diagram** and **relational schema** were constructed.
+회원 정보, 트레이너 배정, PT 예약 일정, 운동 기록, 결제 내역을 저장하고 관리합니다.
 
 ---
 
-## ✔ Functional Requirements
-1. Administrators must be able to register, edit, and delete member information.  
-2. Members must be able to reserve PT sessions with specific trainers.  
-3. One trainer must be able to train multiple members.  
-4. Members must be able to record workout results (date, exercise type, sets, weight, etc.).  
-5. PT reservations must be managed by date and time.  
-6. Members must be able to make multiple PT payments, and all payment history must be stored.
+## ✔ 기능 요구사항
+
+1. 관리자는 회원 정보를 등록, 수정, 삭제할 수 있어야 한다.
+2. 회원은 특정 트레이너와 PT 세션을 예약할 수 있어야 한다.
+3. 한 명의 트레이너는 여러 회원을 담당할 수 있어야 한다.
+4. 회원은 운동 결과(날짜, 운동 종류, 세트, 무게 등)를 기록할 수 있어야 한다.
+5. PT 예약은 날짜와 시간 단위로 관리되어야 한다.
+6. 회원은 여러 건의 PT 결제를 할 수 있으며, 모든 결제 내역이 저장되어야 한다.
 
 ---
 
-## ✔ Non-Functional Requirements
-1. The system must maintain **data integrity**.  
-2. The schema must minimize data redundancy through **normalization**.  
-3. Every entity must include a **primary key**.  
-4. Referential integrity must be preserved on deletion and modification.
+## ✔ 비기능 요구사항
+
+1. 데이터 무결성을 유지해야 한다.
+2. 정규화를 통해 데이터 중복을 최소화해야 한다.
+3. 모든 엔티티는 기본 키를 포함해야 한다.
+4. 삭제 및 수정 시 참조 무결성이 보장되어야 한다.
 
 ---
 
-## 📘 Entities (Summary)
+## 📎 ER 다이어그램
 
-### **1. Member**
-- member_id (PK)  
-- name  
-- phone  
-- gender  
-- join_date  
-- expiry_date  
-- remaining_pt_count  
-
-### **2. Trainer**
-- trainer_id (PK)  
-- name  
-- specialty  
-- career_year  
-
-### **3. PT_Session**
-- session_id (PK)  
-- member_id (FK → Member.member_id)  
-- trainer_id (FK → Trainer.trainer_id)  
-- session_date  
-- session_time  
-- status  
-
-### **4. Exercise**
-- exercise_id (PK)  
-- name  
-- part  
-
-### **5. Workout_Log**
-- log_id (PK)  
-- member_id (FK → Member.member_id)  
-- exercise_id (FK → Exercise.exercise_id)  
-- log_date  
-- weight  
-- sets  
-- reps  
-- feedback  
-
-### **6. Payment**
-- payment_id (PK)  
-- member_id (FK → Member.member_id)  
-- amount  
-- payment_date  
-- method  
-- category  
-
----
-
-## 🔗 Relationship Summary
-
-### **Trainer — PT_Session**
-- Relationship: **1 : N**
-- One trainer can conduct PT sessions for many members.  
-- Each PT session is linked to a single trainer.
-
-### **Member — PT_Session**
-- Relationship: **1 : N**
-- One member can reserve multiple PT sessions.
-
-### **Member — Workout_Log**
-- Relationship: **1 : N**
-- One member can have many workout logs.
-
-### **Exercise — Workout_Log**
-- Relationship: **1 : N**
-- One exercise type can appear in multiple workout logs.
-
-### **Member — Payment**
-- Relationship: **1 : N**
-- A member can have multiple payment records.
-
----
-
-## 📚 Relational Schema (Summary)
-
-**Member(**  
-member_id PK,  
-name, phone, gender, join_date, expiry_date, remaining_pt_count  
-**)**  
-
-**Trainer(**  
-trainer_id PK,  
-name, specialty, career_year  
-**)**  
-
-**Exercise(**  
-exercise_id PK,  
-name, part  
-**)**  
-
-**PT_Session(**  
-session_id PK,  
-member_id FK,  
-trainer_id FK,  
-session_date,  
-session_time,  
-status  
-**)**  
-
-**Workout_Log(**  
-log_id PK,  
-member_id FK,  
-exercise_id FK,  
-log_date, weight, sets, reps, feedback  
-**)**  
-
-**Payment(**  
-payment_id PK,  
-member_id FK,  
-amount, payment_date, method, category  
-**)**  
-
----
-
-## 📎 ER Diagram
 <img width="1274" height="717" alt="image" src="https://github.com/user-attachments/assets/cbc83050-72ff-4657-82a0-bc232f7cf6ba" />
-
----
-
-🛠 Technologies Used
-
-Oracle SQL Developer
-
-Oracle Database XE
-
-SQL (DDL, DML, JOIN, Subquery)
-
-Docker / Docker Compose
-
-GitHub Actions (SQL Lint CI)
-
-Git / GitHub
 
 ---
 
@@ -201,7 +69,7 @@ docker compose down -v     # 컨테이너 + 볼륨 삭제
 
 ---
 
-## ✅ CI — SQL Lint (GitHub Actions)
+## ✅ CI — SQL 린트 (GitHub Actions)
 
 `.sql` 파일이 변경되어 push 또는 PR이 생성되면 **sqlfluff**가 자동으로 SQL 문법을 검사합니다.
 
@@ -210,14 +78,26 @@ docker compose down -v     # 컨테이너 + 볼륨 삭제
   └─ lint.yml : sqlfluff lint *.sql --dialect oracle
 ```
 
-![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
+---
 
+## 🛠 사용 기술
 
-## 🎬 Demonstration Video (Korean Version)
+| 분야 | 기술 |
+|------|------|
+| 데이터베이스 | Oracle Database XE 21c |
+| SQL | DDL, DML, JOIN, 서브쿼리, 트리거, 시퀀스 |
+| 컨테이너 | Docker / Docker Compose |
+| CI | GitHub Actions, sqlfluff |
+| 버전 관리 | Git / GitHub |
+
+---
+
+## 🎬 시연 영상
+
 [![Demo Video](https://img.youtube.com/vi/XsdbgZr0mJI/0.jpg)](https://www.youtube.com/watch?v=XsdbgZr0mJI)
 
+---
 
-👤 Author
+👤 **작성자**
 
-Gwangmin
-Myongji University – Dept. of Computer Science
+박광민 · 명지대학교 컴퓨터공학과
