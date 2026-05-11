@@ -27,5 +27,8 @@ jobs:
       - name: Install sqlfluff
         run: pip install sqlfluff
 
+      - name: Fix SQL formatting
+        run: sqlfluff fix *.sql --dialect oracle --force
+
       - name: Run SQL lint
         run: sqlfluff lint *.sql --dialect oracle
