@@ -1,0 +1,90 @@
+name: Schema Test (PostgreSQL)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sql/**'
+      - '.github/workflows/schema-test.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sql/**'
+      - '.github/workflows/schema-test.yml'
+
+jobs:
+  test:
+    name: Apply & Verify PostgreSQL Schema
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: gymdb
+          POSTGRES_USER: gymadmin
+          POSTGRES_PASSWORD: testpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: gymdb
+      PGUSER: gymadmin
+      PGPASSWORD: testpassword
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply schema
+        run: psql -f sql/01_create_tables_pg.sql
+
+      - name: Verify — INSERT sample rows
+        run: |
+          psql <<'SQL'
+            INSERT INTO Trainer (name, specialty, career_year)
+              VALUES ('김트레이너', '체형교정', 5);
+
+            INSERT INTO Exercise (name, part)
+              VALUES ('스쿼트', '하체');
+
+            INSERT INTO Member (name, phone, gender, join_date, expiry_date, remaining_pt_count)
+              VALUES ('홍길동', '010-0000-0001', 'M', CURRENT_DATE, CURRENT_DATE + 365, 10);
+
+            INSERT INTO PT_Session (member_id, trainer_id, session_date, session_time, status)
+              VALUES (1, 1, CURRENT_DATE + 1, '10:00', 'SCHEDULED');
+
+            INSERT INTO Workout_Log (member_id, exercise_id, log_date, weight, sets, reps)
+              VALUES (1, 1, CURRENT_DATE, 80.0, 3, 10);
+
+            INSERT INTO Payment (member_id, amount, payment_date, method, category)
+              VALUES (1, 300000, CURRENT_DATE, 'Card', 'PT');
+          SQL
+
+      - name: Verify — SELECT & JOIN
+        run: |
+          psql <<'SQL'
+            SELECT
+              m.name        AS member,
+              t.name        AS trainer,
+              s.session_date,
+              s.session_time,
+              s.status
+            FROM PT_Session s
+            JOIN Member  m ON s.member_id  = m.member_id
+            JOIN Trainer t ON s.trainer_id = t.trainer_id;
+
+            SELECT
+              m.name AS member,
+              SUM(p.amount) AS total_payment
+            FROM Payment p
+            JOIN Member m ON p.member_id = m.member_id
+            GROUP BY m.name;
+          SQL

@@ -3,6 +3,8 @@
 **박광민**
 
 ![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
+![Schema Test](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/schema-test.yml/badge.svg)
+![Terraform CI](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/terraform.yml/badge.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-≥1.6-844FBA?logo=terraform&logoColor=white)
 ![AWS RDS](https://img.shields.io/badge/AWS-RDS-FF9900?logo=amazonaws&logoColor=white)
@@ -216,13 +218,21 @@ terraform apply
 
 ---
 
-## CI — SQL 린트
+## CI 파이프라인
 
-`.sql` 파일 변경 시 **sqlfluff**가 자동으로 Oracle SQL 문법을 검사합니다.
+| 워크플로우 | 트리거 | 내용 |
+|-----------|--------|------|
+| `lint.yml` | `.sql` 변경 | sqlfluff로 Oracle SQL 문법 검사 |
+| `schema-test.yml` | `sql/` 변경 | PostgreSQL 컨테이너에 스키마 적용 + JOIN 쿼리 검증 |
+| `terraform.yml` | `terraform/` 변경 | `fmt -check` → `validate` → `plan` (AWS credentials 설정 시) |
 
 ```
-.sql 파일 변경 push / PR
-  └─ lint.yml : sqlfluff lint *.sql --dialect oracle
+sql/ 변경 push / PR
+  ├─ lint.yml        : sqlfluff (Oracle 문법 검사)
+  └─ schema-test.yml : PostgreSQL 컨테이너 → 스키마 적용 → INSERT/SELECT 검증
+
+terraform/ 변경 push / PR
+  └─ terraform.yml   : fmt -check → init -backend=false → validate → plan
 ```
 
 ---
