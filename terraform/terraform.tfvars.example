@@ -1,0 +1,24 @@
+# cp terraform.tfvars.example terraform.tfvars 후 값 수정
+# ⚠ terraform.tfvars는 .gitignore에 추가 (패스워드 포함)
+
+aws_region   = "ap-northeast-2"
+project_name = "gym-mgmt"
+
+# ── Stage 3: dev (프리티어, Single-AZ) ────────────────────────
+environment              = "dev"
+db_username              = "gymadmin"
+db_password              = "CHANGE_ME_strong_password1!"
+db_instance_class        = "db.t3.micro"
+db_allocated_storage     = 20
+db_max_allocated_storage = 100
+multi_az                 = false
+create_read_replica      = false
+storage_encrypted        = false
+
+# ── Stage 4: prod (Multi-AZ + Read Replica + 암호화) ──────────
+# environment              = "prod"
+# db_password              = "CHANGE_ME_strong_password1!"
+# db_instance_class        = "db.t3.small"
+# multi_az                 = true
+# create_read_replica      = true
+# storage_encrypted        = true

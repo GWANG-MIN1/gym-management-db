@@ -1,0 +1,10 @@
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars        # 패스워드 포함 — 절대 커밋 금지
+terraform/*.tfplan
+
+# OS
+.DS_Store
+Thumbs.db

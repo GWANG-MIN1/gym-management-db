@@ -154,12 +154,133 @@ docker compose down -v     # 컨테이너 + 볼륨 삭제
 
 ---
 
+## ☁️ AWS RDS + Terraform (Stage 3)
+
+Oracle XE → **PostgreSQL 15** 로 마이그레이션 후 AWS RDS에 배포합니다.
+
+> PostgreSQL을 선택한 이유: RDS 프리티어 지원(`db.t3.micro`), Oracle과 유사한 SQL 문법, 실무 채택률 1위
+
+### 디렉터리 구조
+
+```
+terraform/
+├── main.tf                   # provider, backend 설정
+├── variables.tf              # 모든 입력 변수
+├── outputs.tf                # endpoint, port 등 출력
+├── vpc.tf                    # VPC, Subnet, SG
+├── rds.tf                    # RDS Primary + Read Replica + IAM
+├── kms.tf                    # KMS (암호화 활성화 시 생성)
+└── terraform.tfvars.example  # 설정 예시
+
+sql/
+└── 01_create_tables_pg.sql   # Oracle → PostgreSQL 마이그레이션 스키마
+```
+
+### Stage 3 실행 (dev — 프리티어)
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvars에서 db_password 수정
+
+terraform init
+terraform plan
+terraform apply
+```
+
+**비용 (dev, ap-northeast-2 기준)**
+
+| 리소스 | 스펙 | 월 비용 |
+|--------|------|---------|
+| RDS PostgreSQL | db.t3.micro, 20GB gp3 | 프리티어 750시간 무료 |
+| VPC, Subnet, SG | - | 무료 |
+
+---
+
+## 🏗️ Multi-AZ + Read Replica + 암호화 (Stage 4)
+
+> 비용 문제로 **실습 대신 Terraform 코드 + 아키텍처 다이어그램**으로 대체합니다.
+> `terraform.tfvars`에서 플래그만 바꾸면 동일 코드로 prod 구성 적용 가능합니다.
+
+### 아키텍처
+
+```mermaid
+graph TB
+    subgraph AWS ap-northeast-2
+        subgraph VPC 10.0.0.0/16
+            subgraph Public Subnet AZ-a
+                APP[🖥 App Server]
+            end
+
+            subgraph Private Subnet AZ-a
+                PRIMARY[(RDS Primary\nPostgreSQL 15\nAZ-a)]
+            end
+
+            subgraph Private Subnet AZ-b
+                STANDBY[(Multi-AZ Standby\n자동 Failover 대기\nAZ-b)]
+                REPLICA[(Read Replica\n읽기 전용\nAZ-b)]
+            end
+        end
+
+        KMS[🔑 KMS CMK\n스토리지 암호화]
+        CW[📊 CloudWatch\nEnhanced Monitoring]
+    end
+
+    APP -->|쓰기 / 읽기| PRIMARY
+    APP -->|읽기 전용 쿼리| REPLICA
+    PRIMARY <-->|동기 복제 Sync| STANDBY
+    PRIMARY -.->|비동기 복제 Async| REPLICA
+    KMS -.->|암호화| PRIMARY
+    KMS -.->|암호화| STANDBY
+    KMS -.->|암호화| REPLICA
+    PRIMARY --> CW
+    REPLICA --> CW
+```
+
+### Multi-AZ vs Read Replica 비교
+
+| 항목 | Multi-AZ Standby | Read Replica |
+|------|-----------------|--------------|
+| 목적 | **고가용성 (HA)** — 장애 복구 | **읽기 확장** — 부하 분산 |
+| 복제 방식 | 동기(Synchronous) | 비동기(Asynchronous) |
+| 직접 쿼리 | ❌ 불가 | ✅ 가능 |
+| Failover | 자동 (60~120초) | 수동 프로모션 |
+| AZ | Primary와 다른 AZ | 설정 가능 (심지어 다른 Region) |
+
+### Stage 4 적용 방법
+
+```hcl
+# terraform.tfvars
+environment         = "prod"
+db_instance_class   = "db.t3.small"
+multi_az            = true
+create_read_replica = true
+storage_encrypted   = true
+```
+
+```bash
+terraform apply   # 변수만 바꾸면 동일 코드로 prod 구성 완성
+```
+
+**비용 (prod, ap-northeast-2 기준)**
+
+| 리소스 | 월 비용 (약) |
+|--------|------------|
+| RDS Primary (db.t3.small, Multi-AZ) | ~$60 |
+| Read Replica (db.t3.small) | ~$30 |
+| KMS CMK | ~$1 |
+| **합계** | **~$91/월** |
+
+---
+
 ## 🛠 사용 기술
 
 | 분야 | 기술 |
 |------|------|
-| 데이터베이스 | Oracle Database XE 21c |
+| 데이터베이스 | Oracle Database XE 21c (로컬), PostgreSQL 15 (AWS RDS) |
 | SQL | DDL, DML, JOIN, 서브쿼리, 트리거, 시퀀스 |
+| 인프라 | AWS RDS, VPC, KMS |
+| IaC | Terraform >= 1.6, AWS Provider ~5.0 |
 | 컨테이너 | Docker / Docker Compose |
 | CI | GitHub Actions, sqlfluff |
 | 버전 관리 | Git / GitHub |
