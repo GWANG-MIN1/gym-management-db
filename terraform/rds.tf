@@ -15,7 +15,7 @@ resource "aws_db_parameter_group" "main" {
 
   parameter {
     name  = "log_min_duration_statement"
-    value = "1000"  # 1초 이상 쿼리 로깅
+    value = "1000" # 1초 이상 쿼리 로깅
   }
 
   tags = { Name = "${local.name}-pg15" }
@@ -73,7 +73,7 @@ resource "aws_db_instance" "primary" {
 
   # Backup
   backup_retention_period = var.environment == "prod" ? 7 : 1
-  backup_window           = "18:00-19:00"  # UTC (KST 03:00-04:00)
+  backup_window           = "18:00-19:00" # UTC (KST 03:00-04:00)
   maintenance_window      = "Mon:19:00-Mon:20:00"
 
   # Enhanced Monitoring (60초 간격)

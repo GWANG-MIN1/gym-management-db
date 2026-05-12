@@ -82,7 +82,7 @@ resource "aws_security_group" "app" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # prod에서는 특정 IP로 제한 권장
+    cidr_blocks = ["0.0.0.0/0"] # prod에서는 특정 IP로 제한 권장
   }
 
   egress {

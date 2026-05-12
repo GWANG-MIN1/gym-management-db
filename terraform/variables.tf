@@ -38,7 +38,7 @@ variable "db_password" {
 variable "db_instance_class" {
   description = "RDS instance class"
   type        = string
-  default     = "db.t3.micro"  # free-tier eligible
+  default     = "db.t3.micro" # free-tier eligible
 }
 
 variable "db_allocated_storage" {
