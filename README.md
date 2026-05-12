@@ -1,208 +1,20 @@
-# 🏋️‍♂️ 피트니스 센터 관리 시스템
+# Gym Management DB — PostgreSQL · AWS RDS · Terraform
 
 **박광민**
 
 ![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-≥1.6-844FBA?logo=terraform&logoColor=white)
+![AWS RDS](https://img.shields.io/badge/AWS-RDS-FF9900?logo=amazonaws&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Oracle](https://img.shields.io/badge/Oracle-XE_21c-F80000?logo=oracle&logoColor=white)
+
+피트니스 센터 운영 데이터(회원, 트레이너, PT 예약, 운동 기록, 결제)를 관리하는 데이터베이스 시스템입니다.  
+Oracle XE 로컬 환경에서 시작해 **AWS RDS(PostgreSQL)로 클라우드 마이그레이션**, Terraform으로 Multi-AZ · Read Replica · KMS 암호화까지 인프라를 코드화했습니다.
 
 ---
 
-## 📌 프로젝트 개요
-
-피트니스 센터에서 발생하는 다양한 데이터를 효율적으로 관리하기 위한 데이터베이스 시스템입니다.
-
-회원 정보, 트레이너 배정, PT 예약 일정, 운동 기록, 결제 내역을 저장하고 관리합니다.
-
----
-
-## ✔ 기능 요구사항
-
-1. 관리자는 회원 정보를 등록, 수정, 삭제할 수 있어야 한다.
-2. 회원은 특정 트레이너와 PT 세션을 예약할 수 있어야 한다.
-3. 한 명의 트레이너는 여러 회원을 담당할 수 있어야 한다.
-4. 회원은 운동 결과(날짜, 운동 종류, 세트, 무게 등)를 기록할 수 있어야 한다.
-5. PT 예약은 날짜와 시간 단위로 관리되어야 한다.
-6. 회원은 여러 건의 PT 결제를 할 수 있으며, 모든 결제 내역이 저장되어야 한다.
-
----
-
-## ✔ 비기능 요구사항
-
-1. 데이터 무결성을 유지해야 한다.
-2. 정규화를 통해 데이터 중복을 최소화해야 한다.
-3. 모든 엔티티는 기본 키를 포함해야 한다.
-4. 삭제 및 수정 시 참조 무결성이 보장되어야 한다.
-
----
-
-## 📘 Entities (Summary)
-
-### **1. Member**
-- member_id (PK)
-- name, phone, gender, join_date, expiry_date, remaining_pt_count
-
-### **2. Trainer**
-- trainer_id (PK)
-- name, specialty, career_year
-
-### **3. PT_Session**
-- session_id (PK)
-- member_id (FK → Member.member_id)
-- trainer_id (FK → Trainer.trainer_id)
-- session_date, session_time, status
-
-### **4. Exercise**
-- exercise_id (PK)
-- name, part
-
-### **5. Workout_Log**
-- log_id (PK)
-- member_id (FK → Member.member_id)
-- exercise_id (FK → Exercise.exercise_id)
-- log_date, weight, sets, reps, feedback
-
-### **6. Payment**
-- payment_id (PK)
-- member_id (FK → Member.member_id)
-- amount, payment_date, method, category
-
----
-
-## 🔗 Relationship Summary
-
-### **Trainer — PT_Session**
-- Relationship: **1 : N**
-- One trainer can conduct PT sessions for many members.
-- Each PT session is linked to a single trainer.
-
-### **Member — PT_Session**
-- Relationship: **1 : N**
-- One member can reserve multiple PT sessions.
-
-### **Member — Workout_Log**
-- Relationship: **1 : N**
-- One member can have many workout logs.
-
-### **Exercise — Workout_Log**
-- Relationship: **1 : N**
-- One exercise type can appear in multiple workout logs.
-
-### **Member — Payment**
-- Relationship: **1 : N**
-- A member can have multiple payment records.
-
----
-
-## 📚 Relational Schema (Summary)
-
-**Member(** member_id PK, name, phone, gender, join_date, expiry_date, remaining_pt_count **)**
-
-**Trainer(** trainer_id PK, name, specialty, career_year **)**
-
-**Exercise(** exercise_id PK, name, part **)**
-
-**PT_Session(** session_id PK, member_id FK, trainer_id FK, session_date, session_time, status **)**
-
-**Workout_Log(** log_id PK, member_id FK, exercise_id FK, log_date, weight, sets, reps, feedback **)**
-
-**Payment(** payment_id PK, member_id FK, amount, payment_date, method, category **)**
-
----
-
-## 📎 ER 다이어그램
-
-<img width="1274" height="717" alt="image" src="https://github.com/user-attachments/assets/cbc83050-72ff-4657-82a0-bc232f7cf6ba" />
-
----
-
-## 🐳 로컬 실행 (Docker)
-
-Oracle XE 환경을 Docker로 한 번에 실행할 수 있습니다.
-
-```bash
-docker compose up -d
-```
-
-- Oracle XE 21c 컨테이너가 시작되며 스키마와 샘플 데이터가 자동으로 초기화됩니다.
-- 최초 실행 시 초기화에 약 2~3분 소요됩니다.
-
-**접속 정보**
-
-| 항목 | 값 |
-|------|-----|
-| Host | localhost |
-| Port | 1521 |
-| User | gymuser |
-| Password | gymuser123 |
-| SID | XE |
-
-**컨테이너 종료**
-```bash
-docker compose down        # 컨테이너만 종료 (데이터 유지)
-docker compose down -v     # 컨테이너 + 볼륨 삭제
-```
-
----
-
-## ✅ CI — SQL 린트 (GitHub Actions)
-
-`.sql` 파일이 변경되어 push 또는 PR이 생성되면 **sqlfluff**가 자동으로 SQL 문법을 검사합니다.
-
-```
-.sql 파일 변경 push / PR
-  └─ lint.yml : sqlfluff lint *.sql --dialect oracle
-```
-
----
-
-## ☁️ AWS RDS + Terraform (Stage 3)
-
-Oracle XE → **PostgreSQL 15** 로 마이그레이션 후 AWS RDS에 배포합니다.
-
-> PostgreSQL을 선택한 이유: RDS 프리티어 지원(`db.t3.micro`), Oracle과 유사한 SQL 문법, 실무 채택률 1위
-
-### 디렉터리 구조
-
-```
-terraform/
-├── main.tf                   # provider, backend 설정
-├── variables.tf              # 모든 입력 변수
-├── outputs.tf                # endpoint, port 등 출력
-├── vpc.tf                    # VPC, Subnet, SG
-├── rds.tf                    # RDS Primary + Read Replica + IAM
-├── kms.tf                    # KMS (암호화 활성화 시 생성)
-└── terraform.tfvars.example  # 설정 예시
-
-sql/
-└── 01_create_tables_pg.sql   # Oracle → PostgreSQL 마이그레이션 스키마
-```
-
-### Stage 3 실행 (dev — 프리티어)
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 db_password 수정
-
-terraform init
-terraform plan
-terraform apply
-```
-
-**비용 (dev, ap-northeast-2 기준)**
-
-| 리소스 | 스펙 | 월 비용 |
-|--------|------|---------|
-| RDS PostgreSQL | db.t3.micro, 20GB gp3 | 프리티어 750시간 무료 |
-| VPC, Subnet, SG | - | 무료 |
-
----
-
-## 🏗️ Multi-AZ + Read Replica + 암호화 (Stage 4)
-
-> 비용 문제로 **실습 대신 Terraform 코드 + 아키텍처 다이어그램**으로 대체합니다.
-> `terraform.tfvars`에서 플래그만 바꾸면 동일 코드로 prod 구성 적용 가능합니다.
-
-### 아키텍처
+## 아키텍처
 
 ```mermaid
 graph TB
@@ -237,62 +49,196 @@ graph TB
     REPLICA --> CW
 ```
 
-### Multi-AZ vs Read Replica 비교
+---
+
+## 기술적 의사결정
+
+### Oracle 대신 PostgreSQL을 선택한 이유
+
+| 항목 | Oracle XE | PostgreSQL 15 |
+|------|-----------|---------------|
+| AWS RDS 프리티어 | ❌ 없음 | ✅ db.t3.micro 750시간 |
+| 라이선스 | 상용 | 오픈소스 |
+| SQL 문법 호환성 | - | Oracle과 가장 유사 |
+| 실무 채택률 | 레거시 중심 | 신규 서비스 1위 |
+
+마이그레이션 시 주요 문법 변환:
+
+```sql
+-- Oracle
+NUMBER PRIMARY KEY          →  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+VARCHAR2(50)                →  VARCHAR(50)
+SYSDATE                     →  CURRENT_DATE
+REGEXP_LIKE(col, '^\d{2}')  →  col ~ '^\d{2}'
+```
+
+### Multi-AZ vs Read Replica
+
+두 기능 모두 "복제본"이지만 목적이 완전히 다릅니다.
 
 | 항목 | Multi-AZ Standby | Read Replica |
 |------|-----------------|--------------|
-| 목적 | **고가용성 (HA)** — 장애 복구 | **읽기 확장** — 부하 분산 |
-| 복제 방식 | 동기(Synchronous) | 비동기(Asynchronous) |
+| 목적 | **고가용성(HA)** — 장애 복구 | **읽기 확장** — 부하 분산 |
+| 복제 방식 | 동기(Synchronous) — 데이터 손실 없음 | 비동기(Asynchronous) — 약간의 지연 허용 |
 | 직접 쿼리 | ❌ 불가 | ✅ 가능 |
-| Failover | 자동 (60~120초) | 수동 프로모션 |
-| AZ | Primary와 다른 AZ | 설정 가능 (심지어 다른 Region) |
+| Failover | 자동 (60~120초) | 수동 프로모션 필요 |
+| 비용 | Primary의 2배 | Primary와 동일 |
 
-### Stage 4 적용 방법
+> **설계 결정**: 통계/리포트성 읽기 쿼리는 Read Replica로 라우팅해 Primary 부하를 줄이고, Multi-AZ로 단일 장애점(SPOF)을 제거했습니다.
+
+### Terraform으로 인프라를 코드화한 이유
+
+AWS 콘솔 클릭 대신 코드로 인프라를 정의하면:
+- `dev` / `prod` 환경 차이를 **변수 3개**로 관리
+- `terraform destroy` 한 줄로 과금 리소스 즉시 삭제
+- Git으로 인프라 변경 이력 추적 가능
+
+---
+
+## 프로젝트 구조
+
+```
+gym-management-db/
+├── 01_create_tables.sql          Oracle XE 스키마 (로컬 개발용)
+├── 02_insert_sample_data.sql     샘플 데이터
+├── 03_project_queries.sql        비즈니스 쿼리 (JOIN, 서브쿼리 등)
+├── docker-compose.yml            Oracle XE 로컬 환경
+│
+├── sql/
+│   └── 01_create_tables_pg.sql   PostgreSQL 15 마이그레이션 스키마
+│
+├── terraform/
+│   ├── main.tf                   provider 설정
+│   ├── variables.tf              dev/prod 입력 변수
+│   ├── outputs.tf                endpoint, port 출력
+│   ├── vpc.tf                    VPC, 서브넷, 보안 그룹
+│   ├── rds.tf                    RDS Primary + Read Replica + IAM
+│   ├── kms.tf                    KMS 암호화 키
+│   └── terraform.tfvars.example  설정 예시
+│
+└── .github/workflows/
+    └── lint.yml                  sqlfluff SQL 린트 CI
+```
+
+---
+
+## 로컬 실행 (Docker)
+
+Oracle XE 21c 환경을 Docker로 한 번에 실행합니다.
+
+```bash
+docker compose up -d
+```
+
+스키마와 샘플 데이터가 자동으로 초기화됩니다. 최초 실행 시 약 2~3분 소요됩니다.
+
+| 항목 | 값 |
+|------|----|
+| Host | localhost |
+| Port | 1521 |
+| User | gymuser |
+| Password | gymuser123 |
+| SID | XE |
+
+```bash
+docker compose down     # 컨테이너만 종료 (데이터 유지)
+docker compose down -v  # 컨테이너 + 볼륨 삭제
+```
+
+---
+
+## AWS 배포 (Terraform)
+
+### 사전 준비
+
+```bash
+aws configure  # AWS 자격증명 설정
+```
+
+### Stage 3 — dev (프리티어, Single-AZ)
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# terraform.tfvars에서 db_password 수정
+
+terraform init
+terraform plan
+terraform apply
+```
+
+**예상 비용**: db.t3.micro 프리티어 기준 무료 (750시간/월)
+
+### Stage 4 — prod (Multi-AZ + Read Replica + 암호화)
+
+`terraform.tfvars`에서 아래 3개 플래그만 변경합니다.
 
 ```hcl
-# terraform.tfvars
 environment         = "prod"
-db_instance_class   = "db.t3.small"
-multi_az            = true
-create_read_replica = true
-storage_encrypted   = true
+multi_az            = true   # Standby 인스턴스 자동 생성
+create_read_replica = true   # 읽기 전용 복제본 생성
+storage_encrypted   = true   # KMS CMK로 디스크 암호화
 ```
 
 ```bash
-terraform apply   # 변수만 바꾸면 동일 코드로 prod 구성 완성
+terraform apply
 ```
 
-**비용 (prod, ap-northeast-2 기준)**
+**예상 비용 (ap-northeast-2)**
 
-| 리소스 | 월 비용 (약) |
-|--------|------------|
-| RDS Primary (db.t3.small, Multi-AZ) | ~$60 |
-| Read Replica (db.t3.small) | ~$30 |
-| KMS CMK | ~$1 |
-| **합계** | **~$91/월** |
+| 리소스 | 스펙 | 월 비용 |
+|--------|------|---------|
+| RDS Primary (Multi-AZ) | db.t3.small | ~$60 |
+| Read Replica | db.t3.small | ~$30 |
+| KMS CMK | - | ~$1 |
+| **합계** | | **~$91** |
+
+> 실습 후에는 반드시 `terraform destroy`로 리소스를 삭제하세요.
 
 ---
 
-## 🛠 사용 기술
+## DB 스키마
+
+### ER 다이어그램
+
+<img width="1274" height="717" alt="ER Diagram" src="https://github.com/user-attachments/assets/cbc83050-72ff-4657-82a0-bc232f7cf6ba" />
+
+### 테이블 요약
+
+| 테이블 | 설명 | 주요 컬럼 |
+|--------|------|----------|
+| Member | 회원 정보 | member_id, name, phone, expiry_date, remaining_pt_count |
+| Trainer | 트레이너 정보 | trainer_id, name, specialty, career_year |
+| Exercise | 운동 종목 | exercise_id, name, part |
+| PT_Session | PT 예약 | session_id, member_id, trainer_id, session_date, status |
+| Workout_Log | 운동 기록 | log_id, member_id, exercise_id, weight, sets, reps |
+| Payment | 결제 내역 | payment_id, member_id, amount, method, category |
+
+---
+
+## CI — SQL 린트
+
+`.sql` 파일 변경 시 **sqlfluff**가 자동으로 Oracle SQL 문법을 검사합니다.
+
+```
+.sql 파일 변경 push / PR
+  └─ lint.yml : sqlfluff lint *.sql --dialect oracle
+```
+
+---
+
+## 사용 기술
 
 | 분야 | 기술 |
 |------|------|
-| 데이터베이스 | Oracle Database XE 21c (로컬), PostgreSQL 15 (AWS RDS) |
-| SQL | DDL, DML, JOIN, 서브쿼리, 트리거, 시퀀스 |
-| 인프라 | AWS RDS, VPC, KMS |
-| IaC | Terraform >= 1.6, AWS Provider ~5.0 |
-| 컨테이너 | Docker / Docker Compose |
+| 데이터베이스 | Oracle XE 21c (로컬), PostgreSQL 15 (AWS RDS) |
+| SQL | DDL, DML, JOIN, 서브쿼리, 집계 함수 |
+| 클라우드 | AWS RDS, VPC, KMS, IAM, CloudWatch |
+| IaC | Terraform ≥ 1.6, AWS Provider ~5.0 |
+| 컨테이너 | Docker, Docker Compose |
 | CI | GitHub Actions, sqlfluff |
-| 버전 관리 | Git / GitHub |
+| 버전 관리 | Git, GitHub |
 
 ---
 
-## 🎬 시연 영상
-
-[![Demo Video](https://img.youtube.com/vi/XsdbgZr0mJI/0.jpg)](https://www.youtube.com/watch?v=XsdbgZr0mJI)
-
----
-
-👤 **작성자**
-
-박광민 · 명지대학교 컴퓨터공학과
+👤 **박광민** · 명지대학교 컴퓨터공학과
