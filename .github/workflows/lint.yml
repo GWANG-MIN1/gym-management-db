@@ -3,14 +3,8 @@ name: SQL Lint
 on:
   push:
     branches: [main]
-    paths:
-      - "**.sql"
-      - ".sqlfluff"
   pull_request:
     branches: [main]
-    paths:
-      - "**.sql"
-      - ".sqlfluff"
 
 jobs:
   lint:
