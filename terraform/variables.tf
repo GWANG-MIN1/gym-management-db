@@ -72,3 +72,10 @@ variable "storage_encrypted" {
   type        = bool
   default     = false
 }
+
+# ─── EC2 ─────────────────────────────────────────────────────
+variable "ec2_key_name" {
+  description = "EC2 key pair name for SSH access"
+  type        = string
+  default     = "gym-mgmt-key"
+}

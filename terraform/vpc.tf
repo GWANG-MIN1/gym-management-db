@@ -85,6 +85,14 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"] # prod에서는 특정 IP로 제한 권장
   }
 
+  ingress {
+    description = "API"
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

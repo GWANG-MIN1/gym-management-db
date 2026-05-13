@@ -37,3 +37,18 @@ output "vpc_id" {
   description = "VPC ID"
   value       = aws_vpc.main.id
 }
+
+output "ecr_repository_url" {
+  description = "ECR repository URL for the API image"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+output "ec2_public_ip" {
+  description = "EC2 app server public IP (set as EC2_HOST secret in GitHub)"
+  value       = aws_instance.app.public_ip
+}
+
+output "ec2_public_dns" {
+  description = "EC2 app server public DNS"
+  value       = aws_instance.app.public_dns
+}
