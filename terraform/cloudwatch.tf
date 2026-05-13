@@ -119,10 +119,10 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title   = "RDS 읽기/쓰기 지연시간 (ms)"
-          region  = var.aws_region
+          title  = "RDS 읽기/쓰기 지연시간 (ms)"
+          region = var.aws_region
           metrics = [
-            ["AWS/RDS", "ReadLatency",  "DBInstanceIdentifier", aws_db_instance.primary.identifier],
+            ["AWS/RDS", "ReadLatency", "DBInstanceIdentifier", aws_db_instance.primary.identifier],
             ["AWS/RDS", "WriteLatency", "DBInstanceIdentifier", aws_db_instance.primary.identifier]
           ]
           view   = "timeSeries"
