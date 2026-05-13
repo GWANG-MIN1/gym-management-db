@@ -22,6 +22,11 @@ resource "aws_iam_role_policy_attachment" "ecr_read" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
+  role       = aws_iam_role.ec2_app.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+}
+
 # EC2가 Secrets Manager에서 DB 비밀번호를 가져올 수 있도록
 resource "aws_iam_role_policy" "secrets_read" {
   name = "${local.name}-secrets-read"

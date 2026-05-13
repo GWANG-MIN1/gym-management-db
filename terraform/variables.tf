@@ -79,3 +79,10 @@ variable "ec2_key_name" {
   type        = string
   default     = "gym-mgmt-key"
 }
+
+# ─── Monitoring ───────────────────────────────────────────────
+variable "alert_email" {
+  description = "Email address to receive CloudWatch alarm notifications"
+  type        = string
+  default     = "gwangminions@gmail.com"
+}

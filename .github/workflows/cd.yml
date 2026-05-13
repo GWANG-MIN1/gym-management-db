@@ -78,6 +78,10 @@ jobs:
               --restart unless-stopped \
               -p 8000:8000 \
               -e AWS_REGION="ap-northeast-2" \
+              --log-driver awslogs \
+              --log-opt awslogs-region=ap-northeast-2 \
+              --log-opt awslogs-group=/gym-mgmt-dev/api \
+              --log-opt awslogs-create-group=true \
               "$IMAGE"
 
             # 헬스체크 (최대 30초 대기)

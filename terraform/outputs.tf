@@ -38,6 +38,11 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+output "cloudwatch_dashboard_url" {
+  description = "CloudWatch 대시보드 URL"
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.main.dashboard_name}"
+}
+
 output "db_secret_arn" {
   description = "Secrets Manager ARN — EC2_SSH_KEY 대신 SECRET_ARN GitHub Secret에 등록"
   value       = aws_secretsmanager_secret.db.arn
