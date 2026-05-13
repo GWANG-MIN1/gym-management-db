@@ -13,12 +13,12 @@ def _get_database_url() -> str:
 
     # EC2 배포: Secrets Manager에서 DB 정보 가져오기
     # EC2 IAM 롤이 자동으로 인증 처리 (크레덴셜 코드에 없음)
-    secret_arn = os.getenv("SECRET_ARN")
+    secret_name = os.getenv("SECRET_NAME", "gym-mgmt-dev/db-credentials")
     region = os.getenv("AWS_REGION", "ap-northeast-2")
 
     client = boto3.client("secretsmanager", region_name=region)
     secret = json.loads(
-        client.get_secret_value(SecretId=secret_arn)["SecretString"]
+        client.get_secret_value(SecretId=secret_name)["SecretString"]
     )
 
     return (

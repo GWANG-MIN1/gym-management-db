@@ -77,7 +77,6 @@ jobs:
               --name gym-api \
               --restart unless-stopped \
               -p 8000:8000 \
-              -e SECRET_ARN="${{ secrets.SECRET_ARN }}" \
               -e AWS_REGION="ap-northeast-2" \
               "$IMAGE"
 
