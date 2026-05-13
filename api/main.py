@@ -13,4 +13,4 @@ app.include_router(sessions.router)
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "1.0.0"}
