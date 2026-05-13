@@ -231,8 +231,6 @@ terraform apply
 | `EC2_HOST` | `terraform output ec2_public_ip` |
 | `EC2_SSH_KEY` | `.pem` 파일 전체 내용 |
 
-> 실습 후 반드시 `terraform destroy`로 리소스를 삭제하세요.
-
 ---
 
 ## 기술 스택
