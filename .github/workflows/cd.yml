@@ -89,4 +89,6 @@ jobs:
                 exit 0
               fi
             done
+            echo "=== Docker logs ==="
+            docker logs gym-api --tail 50
             echo "Health check failed" && exit 1
