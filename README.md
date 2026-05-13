@@ -1,99 +1,154 @@
-# Gym Management DB — PostgreSQL · AWS RDS · Terraform
+# Gym Management — PostgreSQL · FastAPI · AWS · Terraform
 
 **박광민**
 
 ![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
 ![Schema Test](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/schema-test.yml/badge.svg)
 ![Terraform CI](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/terraform.yml/badge.svg)
+![CD](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/cd.yml/badge.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-≥1.6-844FBA?logo=terraform&logoColor=white)
-![AWS RDS](https://img.shields.io/badge/AWS-RDS-FF9900?logo=amazonaws&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-RDS·ECR·EC2·SecretsManager-FF9900?logo=amazonaws&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Oracle](https://img.shields.io/badge/Oracle-XE_21c-F80000?logo=oracle&logoColor=white)
 
-피트니스 센터 운영 데이터(회원, 트레이너, PT 예약, 운동 기록, 결제)를 관리하는 데이터베이스 시스템입니다.  
-Oracle XE 로컬 환경에서 시작해 **AWS RDS(PostgreSQL)로 클라우드 마이그레이션**, Terraform으로 Multi-AZ · Read Replica · KMS 암호화까지 인프라를 코드화했습니다.
+피트니스 센터 운영 데이터를 관리하는 풀스택 백엔드 프로젝트입니다.  
+로컬 Oracle XE에서 시작해 **FastAPI 서버 → Docker 컨테이너화 → ECR/EC2 자동 배포 → AWS Secrets Manager 보안 → CloudWatch 모니터링 → 부하 테스트**까지 단계적으로 구축했습니다.
 
 ---
 
 ## 아키텍처
 
-```mermaid
-graph TB
-    subgraph AWS ap-northeast-2
-        subgraph VPC 10.0.0.0/16
-            subgraph Public Subnet AZ-a
-                APP[🖥 App Server]
-            end
+```
+인터넷
+  └─ EC2 (t3.micro, ap-northeast-2a)
+       ├─ gym-api 컨테이너 (FastAPI, :8000)
+       │    └─ 시작 시 Secrets Manager에서 DB 비밀번호 자동 로드
+       └─ Private Subnet
+            └─ RDS PostgreSQL 15 (Primary)
 
-            subgraph Private Subnet AZ-a
-                PRIMARY[(RDS Primary\nPostgreSQL 15\nAZ-a)]
-            end
+GitHub Actions (push 감지)
+  └─ Docker 이미지 빌드
+       └─ ECR push
+            └─ EC2 SSH 배포 → 헬스체크 통과 확인
 
-            subgraph Private Subnet AZ-b
-                STANDBY[(Multi-AZ Standby\n자동 Failover 대기\nAZ-b)]
-                REPLICA[(Read Replica\n읽기 전용\nAZ-b)]
-            end
-        end
-
-        KMS[🔑 KMS CMK\n스토리지 암호화]
-        CW[📊 CloudWatch\nEnhanced Monitoring]
-    end
-
-    APP -->|쓰기 / 읽기| PRIMARY
-    APP -->|읽기 전용 쿼리| REPLICA
-    PRIMARY <-->|동기 복제 Sync| STANDBY
-    PRIMARY -.->|비동기 복제 Async| REPLICA
-    KMS -.->|암호화| PRIMARY
-    KMS -.->|암호화| STANDBY
-    KMS -.->|암호화| REPLICA
-    PRIMARY --> CW
-    REPLICA --> CW
+CloudWatch
+  ├─ RDS CPU / 커넥션 / 지연시간 대시보드
+  ├─ 임계값 초과 시 이메일 알람 (SNS)
+  └─ API 서버 로그 수집 (awslogs 드라이버)
 ```
 
 ---
 
-## 기술적 의사결정
+## 단계별 구현 내용
 
-### Oracle 대신 PostgreSQL을 선택한 이유
+| 단계 | 내용 | 기술 |
+|------|------|------|
+| 1 | DB 스키마 설계 (Oracle → PostgreSQL 마이그레이션) | SQL, Docker |
+| 2 | FastAPI CRUD 서버 + docker-compose | FastAPI, SQLAlchemy, PostgreSQL |
+| 3 | CD 파이프라인 (자동 빌드 → ECR → EC2 배포) | GitHub Actions, ECR, EC2 |
+| 4 | DB 비밀번호 보안 관리 | AWS Secrets Manager, IAM |
+| 5 | 모니터링 + 알람 | CloudWatch, SNS |
+| 6 | 부하 테스트 | k6 |
 
-| 항목 | Oracle XE | PostgreSQL 15 |
-|------|-----------|---------------|
-| AWS RDS 프리티어 | ❌ 없음 | ✅ db.t3.micro 750시간 |
-| 라이선스 | 상용 | 오픈소스 |
-| SQL 문법 호환성 | - | Oracle과 가장 유사 |
-| 실무 채택률 | 레거시 중심 | 신규 서비스 1위 |
+---
 
-마이그레이션 시 주요 문법 변환:
+## API 엔드포인트
 
-```sql
--- Oracle
-NUMBER PRIMARY KEY          →  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
-VARCHAR2(50)                →  VARCHAR(50)
-SYSDATE                     →  CURRENT_DATE
-REGEXP_LIKE(col, '^\d{2}')  →  col ~ '^\d{2}'
+| Method | Path | 설명 |
+|--------|------|------|
+| GET | `/members` | 회원 목록 |
+| POST | `/members` | 회원 등록 |
+| GET | `/members/{id}` | 회원 상세 |
+| GET | `/trainers` | 트레이너 목록 |
+| POST | `/sessions` | PT 예약 |
+| GET | `/health` | 헬스체크 |
+
+Swagger UI: `http://<EC2_IP>:8000/docs`
+
+---
+
+## CI/CD 파이프라인
+
+```
+api/** 코드 변경 → git push → GitHub Actions
+  ├─ build-and-push
+  │    ├─ Docker 이미지 빌드
+  │    └─ ECR push (SHA 태그 + latest)
+  └─ deploy
+       ├─ EC2 SSH 접속
+       ├─ docker pull → 기존 컨테이너 교체
+       └─ /health 헬스체크 통과 확인
 ```
 
-### Multi-AZ vs Read Replica
+---
 
-두 기능 모두 "복제본"이지만 목적이 완전히 다릅니다.
+## 보안 — Secrets Manager
 
-| 항목 | Multi-AZ Standby | Read Replica |
-|------|-----------------|--------------|
-| 목적 | **고가용성(HA)** — 장애 복구 | **읽기 확장** — 부하 분산 |
-| 복제 방식 | 동기(Synchronous) — 데이터 손실 없음 | 비동기(Asynchronous) — 약간의 지연 허용 |
-| 직접 쿼리 | ❌ 불가 | ✅ 가능 |
-| Failover | 자동 (60~120초) | 수동 프로모션 필요 |
-| 비용 | Primary의 2배 | Primary와 동일 |
+DB 비밀번호를 코드나 환경변수에 직접 노출하지 않습니다.
 
-> **설계 결정**: 통계/리포트성 읽기 쿼리는 Read Replica로 라우팅해 Primary 부하를 줄이고, Multi-AZ로 단일 장애점(SPOF)을 제거했습니다.
+```
+기존: DATABASE_URL(비번 포함) → GitHub Secret 평문 저장
+개선: DB 비밀번호 → Secrets Manager 저장
+      EC2 IAM 롤로 접근 권한 부여
+      API 시작 시 자동 로드 (boto3)
+```
 
-### Terraform으로 인프라를 코드화한 이유
+```python
+# api/database.py — 핵심 로직
+secret = boto3.client("secretsmanager").get_secret_value(SecretId=secret_name)
+# 코드 어디에도 비밀번호 없음
+```
 
-AWS 콘솔 클릭 대신 코드로 인프라를 정의하면:
-- `dev` / `prod` 환경 차이를 **변수 3개**로 관리
-- `terraform destroy` 한 줄로 과금 리소스 즉시 삭제
-- Git으로 인프라 변경 이력 추적 가능
+---
+
+## 모니터링
+
+CloudWatch 대시보드에서 실시간 확인:
+
+| 지표 | 알람 임계값 |
+|------|------------|
+| RDS CPU 사용률 | 80% 초과 시 이메일 알람 |
+| RDS 커넥션 수 | 20 초과 시 이메일 알람 |
+| RDS 읽기 지연시간 | 100ms 초과 시 이메일 알람 |
+| API 서버 로그 | CloudWatch Logs 자동 수집 |
+
+---
+
+## 부하 테스트 결과 (k6)
+
+**테스트 환경:** EC2 t3.micro + RDS db.t3.micro (ap-northeast-2)  
+**시나리오:** VU 10명 → 30명 → 50명 단계적 증가 (총 3분 30초)
+
+```
+k6 run load-test/k6_script.js
+```
+
+### 결과 요약
+
+| 지표 | 결과 |
+|------|------|
+| 총 요청 수 | 6,354건 |
+| 처리량 | 30.2 req/s |
+| 에러율 | **0%** |
+| 전체 응답시간 p(95) | 1.66s |
+| POST /members p(95) | **365ms** ✅ |
+| GET /members p(95) | **2,046ms** ⚠️ |
+
+### 분석
+
+```
+쓰기(POST /members): p(95) = 365ms  → 빠름
+읽기(GET /members):  p(95) = 2,046ms → 느림
+```
+
+**GET /members가 느린 이유:** 부하 테스트 중 회원이 계속 등록되면서 데이터가 누적되고, 인덱스 없이 전체 스캔이 발생했습니다.  
+**개선 방향:** Read Replica를 활성화해 읽기 쿼리를 분산하고, 페이지네이션을 추가하면 응답시간을 대폭 줄일 수 있습니다.
+
+```hcl
+# terraform.tfvars — Read Replica 활성화
+create_read_replica = true
+```
 
 ---
 
@@ -101,153 +156,96 @@ AWS 콘솔 클릭 대신 코드로 인프라를 정의하면:
 
 ```
 gym-management-db/
-├── 01_create_tables.sql          Oracle XE 스키마 (로컬 개발용)
-├── 02_insert_sample_data.sql     샘플 데이터
-├── 03_project_queries.sql        비즈니스 쿼리 (JOIN, 서브쿼리 등)
-├── docker-compose.yml            Oracle XE 로컬 환경
+├── api/                          FastAPI 서버
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── main.py                   앱 진입점 + 테이블 자동 생성
+│   ├── database.py               DB 연결 (Secrets Manager 연동)
+│   ├── models.py                 SQLAlchemy ORM 모델
+│   ├── schemas.py                Pydantic 요청/응답 스키마
+│   └── routers/
+│       ├── members.py
+│       ├── trainers.py
+│       └── sessions.py
+│
+├── load-test/
+│   └── k6_script.js              부하 테스트 스크립트
 │
 ├── sql/
-│   └── 01_create_tables_pg.sql   PostgreSQL 15 마이그레이션 스키마
+│   └── 01_create_tables_pg.sql   PostgreSQL 15 스키마
 │
 ├── terraform/
 │   ├── main.tf                   provider 설정
-│   ├── variables.tf              dev/prod 입력 변수
-│   ├── outputs.tf                endpoint, port 출력
-│   ├── vpc.tf                    VPC, 서브넷, 보안 그룹
-│   ├── rds.tf                    RDS Primary + Read Replica + IAM
+│   ├── variables.tf              입력 변수
+│   ├── outputs.tf                엔드포인트, IP 출력
+│   ├── vpc.tf                    VPC, 서브넷, 보안그룹
+│   ├── rds.tf                    RDS Primary + Read Replica
+│   ├── ecr.tf                    ECR 레포지토리
+│   ├── ec2.tf                    EC2 + IAM 롤
+│   ├── secrets.tf                Secrets Manager
+│   ├── cloudwatch.tf             대시보드 + 알람
 │   ├── kms.tf                    KMS 암호화 키
-│   └── terraform.tfvars.example  설정 예시
+│   └── terraform.tfvars.example
 │
+├── docker-compose.yml            로컬 개발 (PostgreSQL + API)
 └── .github/workflows/
-    └── lint.yml                  sqlfluff SQL 린트 CI
+    ├── lint.yml                  SQL 린트
+    ├── schema-test.yml           PostgreSQL 스키마 검증
+    ├── terraform.yml             Terraform fmt/validate
+    └── cd.yml                    빌드 → ECR → EC2 자동 배포
 ```
 
 ---
 
-## 로컬 실행 (Docker)
-
-Oracle XE 21c 환경을 Docker로 한 번에 실행합니다.
+## 로컬 실행
 
 ```bash
 docker compose up -d
 ```
 
-스키마와 샘플 데이터가 자동으로 초기화됩니다. 최초 실행 시 약 2~3분 소요됩니다.
-
 | 항목 | 값 |
 |------|----|
-| Host | localhost |
-| Port | 1521 |
-| User | gymuser |
-| Password | gymuser123 |
-| SID | XE |
-
-```bash
-docker compose down     # 컨테이너만 종료 (데이터 유지)
-docker compose down -v  # 컨테이너 + 볼륨 삭제
-```
+| API | http://localhost:8000 |
+| Swagger | http://localhost:8000/docs |
+| DB Port | 5433 (호스트) |
 
 ---
 
 ## AWS 배포 (Terraform)
 
-### 사전 준비
-
-```bash
-aws configure  # AWS 자격증명 설정
-```
-
-### Stage 3 — dev (프리티어, Single-AZ)
-
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars에서 db_password 수정
+# db_password, ec2_key_name 설정
 
 terraform init
-terraform plan
 terraform apply
 ```
 
-**예상 비용**: db.t3.micro 프리티어 기준 무료 (750시간/월)
+**GitHub Secrets 설정 (CD 파이프라인):**
 
-### Stage 4 — prod (Multi-AZ + Read Replica + 암호화)
+| Secret | 값 |
+|--------|----|
+| `AWS_ACCESS_KEY_ID` | IAM Access Key |
+| `AWS_SECRET_ACCESS_KEY` | IAM Secret Key |
+| `EC2_HOST` | `terraform output ec2_public_ip` |
+| `EC2_SSH_KEY` | `.pem` 파일 전체 내용 |
 
-`terraform.tfvars`에서 아래 3개 플래그만 변경합니다.
-
-```hcl
-environment         = "prod"
-multi_az            = true   # Standby 인스턴스 자동 생성
-create_read_replica = true   # 읽기 전용 복제본 생성
-storage_encrypted   = true   # KMS CMK로 디스크 암호화
-```
-
-```bash
-terraform apply
-```
-
-**예상 비용 (ap-northeast-2)**
-
-| 리소스 | 스펙 | 월 비용 |
-|--------|------|---------|
-| RDS Primary (Multi-AZ) | db.t3.small | ~$60 |
-| Read Replica | db.t3.small | ~$30 |
-| KMS CMK | - | ~$1 |
-| **합계** | | **~$91** |
-
-> 실습 후에는 반드시 `terraform destroy`로 리소스를 삭제하세요.
+> 실습 후 반드시 `terraform destroy`로 리소스를 삭제하세요.
 
 ---
 
-## DB 스키마
-
-### ER 다이어그램
-
-<img width="1274" height="717" alt="ER Diagram" src="https://github.com/user-attachments/assets/cbc83050-72ff-4657-82a0-bc232f7cf6ba" />
-
-### 테이블 요약
-
-| 테이블 | 설명 | 주요 컬럼 |
-|--------|------|----------|
-| Member | 회원 정보 | member_id, name, phone, expiry_date, remaining_pt_count |
-| Trainer | 트레이너 정보 | trainer_id, name, specialty, career_year |
-| Exercise | 운동 종목 | exercise_id, name, part |
-| PT_Session | PT 예약 | session_id, member_id, trainer_id, session_date, status |
-| Workout_Log | 운동 기록 | log_id, member_id, exercise_id, weight, sets, reps |
-| Payment | 결제 내역 | payment_id, member_id, amount, method, category |
-
----
-
-## CI 파이프라인
-
-| 워크플로우 | 트리거 | 내용 |
-|-----------|--------|------|
-| `lint.yml` | `.sql` 변경 | sqlfluff로 Oracle SQL 문법 검사 |
-| `schema-test.yml` | `sql/` 변경 | PostgreSQL 컨테이너에 스키마 적용 + JOIN 쿼리 검증 |
-| `terraform.yml` | `terraform/` 변경 | `fmt -check` → `validate` → `plan` (AWS credentials 설정 시) |
-
-```
-sql/ 변경 push / PR
-  ├─ lint.yml        : sqlfluff (Oracle 문법 검사)
-  └─ schema-test.yml : PostgreSQL 컨테이너 → 스키마 적용 → INSERT/SELECT 검증
-
-terraform/ 변경 push / PR
-  └─ terraform.yml   : fmt -check → init -backend=false → validate → plan
-```
-
----
-
-## 사용 기술
+## 기술 스택
 
 | 분야 | 기술 |
 |------|------|
-| 데이터베이스 | Oracle XE 21c (로컬), PostgreSQL 15 (AWS RDS) |
-| SQL | DDL, DML, JOIN, 서브쿼리, 집계 함수 |
-| 클라우드 | AWS RDS, VPC, KMS, IAM, CloudWatch |
-| IaC | Terraform ≥ 1.6, AWS Provider ~5.0 |
+| 백엔드 | FastAPI 0.115, SQLAlchemy 2.0, Pydantic v2 |
+| 데이터베이스 | PostgreSQL 15 (AWS RDS), Oracle XE 21c (로컬) |
 | 컨테이너 | Docker, Docker Compose |
-| CI | GitHub Actions, sqlfluff |
-| 버전 관리 | Git, GitHub |
+| 클라우드 | AWS EC2, RDS, ECR, Secrets Manager, CloudWatch, SNS, IAM |
+| IaC | Terraform ≥ 1.6 |
+| CI/CD | GitHub Actions |
+| 테스트 | k6 (부하 테스트) |
 
 ---
 
