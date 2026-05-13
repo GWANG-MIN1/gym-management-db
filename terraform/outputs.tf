@@ -38,6 +38,11 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+output "db_secret_arn" {
+  description = "Secrets Manager ARN — EC2_SSH_KEY 대신 SECRET_ARN GitHub Secret에 등록"
+  value       = aws_secretsmanager_secret.db.arn
+}
+
 output "ecr_repository_url" {
   description = "ECR repository URL for the API image"
   value       = aws_ecr_repository.api.repository_url

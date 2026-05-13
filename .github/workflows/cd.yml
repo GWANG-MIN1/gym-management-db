@@ -77,7 +77,8 @@ jobs:
               --name gym-api \
               --restart unless-stopped \
               -p 8000:8000 \
-              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e SECRET_ARN="${{ secrets.SECRET_ARN }}" \
+              -e AWS_REGION="ap-northeast-2" \
               "$IMAGE"
 
             # 헬스체크 (최대 30초 대기)
