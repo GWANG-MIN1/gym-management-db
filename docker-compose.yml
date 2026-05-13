@@ -1,24 +1,34 @@
 services:
-  oracle:
-    image: gvenzl/oracle-xe:21-slim
-    container_name: gym-management-db
+  db:
+    image: postgres:15-alpine
+    container_name: gym-db
     environment:
-      ORACLE_PASSWORD: gymadmin123
-      APP_USER: gymuser
-      APP_USER_PASSWORD: gymuser123
+      POSTGRES_DB: gymdb
+      POSTGRES_USER: gymadmin
+      POSTGRES_PASSWORD: gymadmin123
     ports:
-      - "1521:1521"
+      - "5433:5432"
     volumes:
-      - oracle_data:/opt/oracle/oradata
-      - ./01_create_tables.sql:/container-entrypoint-initdb.d/01_create_tables.sql
-      - ./02_insert_sample_data.sql:/container-entrypoint-initdb.d/02_insert_sample_data.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/01_create_tables_pg.sql:/docker-entrypoint-initdb.d/01_create_tables_pg.sql
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 3m
+      test: ["CMD-SHELL", "pg_isready -U gymadmin -d gymdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build: ./api
+    container_name: gym-api
+    environment:
+      DATABASE_URL: postgresql://gymadmin:gymadmin123@db:5432/gymdb
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
-  oracle_data:
+  postgres_data:
