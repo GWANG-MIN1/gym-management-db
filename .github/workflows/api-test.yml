@@ -1,0 +1,52 @@
+name: API Test
+
+on:
+  workflow_dispatch:
+  workflow_call: # CD 파이프라인이 배포 전에 호출
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'sql/**'
+      - '.github/workflows/api-test.yml'
+
+jobs:
+  pytest:
+    name: pytest (FastAPI + PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: gymdb
+          POSTGRES_USER: gymadmin
+          POSTGRES_PASSWORD: testpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # CHECK 정규식·부분 유니크 인덱스가 PostgreSQL 전용이라 실제 DB 로 테스트한다
+      DATABASE_URL: postgresql://gymadmin:testpassword@localhost:5432/gymdb
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r api/requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -q
+        working-directory: api
