@@ -7,7 +7,9 @@ max_line_length = 120
 indent_unit = space
 tab_space_size = 4
 # 검사 제외 규칙
-exclude_rules = RF05, LT05, CP02, AM05
+#   RF05/LT05/CP02/AM05: 기존 설정 유지
+#   RF04: name / sets / reps / method 처럼 업무상 자연스러운 컬럼명을 그대로 사용
+exclude_rules = RF05, LT05, CP02, AM05, RF04
 
 [sqlfluff:rules:capitalisation.keywords]
 # SQL 키워드 대문자

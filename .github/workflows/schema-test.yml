@@ -40,52 +40,99 @@ jobs:
       PGUSER: gymadmin
       PGPASSWORD: testpassword
 
+    # 모든 psql 호출에 -v ON_ERROR_STOP=1 을 붙인다.
+    # 이 옵션이 없으면 psql 은 SQL 오류가 나도 남은 문장을 계속 실행하고 종료 코드 0 을
+    # 돌려주기 때문에, 스키마가 깨져도 워크플로우가 성공한 것처럼 보인다.
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Apply schema
-        run: psql -f sql/01_create_tables_pg.sql
+        run: psql -v ON_ERROR_STOP=1 -f sql/01_create_tables_pg.sql
 
-      - name: Verify — INSERT sample rows
+      - name: Load sample data
+        run: psql -v ON_ERROR_STOP=1 -f sql/02_insert_sample_data_pg.sql
+
+      - name: Verify — 샘플 데이터 건수
         run: |
-          psql <<'SQL'
-            INSERT INTO Trainer (name, specialty, career_year)
-              VALUES ('김트레이너', '체형교정', 5);
-
-            INSERT INTO Exercise (name, part)
-              VALUES ('스쿼트', '하체');
-
-            INSERT INTO Member (name, phone, gender, join_date, expiry_date, remaining_pt_count)
-              VALUES ('홍길동', '010-0000-0001', 'M', CURRENT_DATE, CURRENT_DATE + 365, 10);
-
-            INSERT INTO PT_Session (member_id, trainer_id, session_date, session_time, status)
-              VALUES (1, 1, CURRENT_DATE + 1, '10:00', 'SCHEDULED');
-
-            INSERT INTO Workout_Log (member_id, exercise_id, log_date, weight, sets, reps)
-              VALUES (1, 1, CURRENT_DATE, 80.0, 3, 10);
-
-            INSERT INTO Payment (member_id, amount, payment_date, method, category)
-              VALUES (1, 300000, CURRENT_DATE, 'Card', 'PT');
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            expected CONSTANT jsonb := '{"member":10,"trainer":10,"exercise":10,
+                                         "pt_session":13,"workout_log":10,"payment":10}';
+            table_name text;
+            actual bigint;
+          BEGIN
+            FOR table_name IN SELECT jsonb_object_keys(expected) LOOP
+              EXECUTE format('SELECT count(*) FROM %I', table_name) INTO actual;
+              IF actual <> (expected ->> table_name)::bigint THEN
+                RAISE EXCEPTION '% 건수가 % 여야 하는데 % 입니다',
+                  table_name, expected ->> table_name, actual;
+              END IF;
+            END LOOP;
+          END $$;
           SQL
 
-      - name: Verify — SELECT & JOIN
+      - name: Verify — INSERT & JOIN
         run: |
-          psql <<'SQL'
-            SELECT
-              m.name        AS member,
-              t.name        AS trainer,
-              s.session_date,
-              s.session_time,
-              s.status
-            FROM PT_Session s
-            JOIN Member  m ON s.member_id  = m.member_id
-            JOIN Trainer t ON s.trainer_id = t.trainer_id;
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO Trainer (name, specialty, career_year)
+            VALUES ('김트레이너', '체형교정', 5);
 
-            SELECT
-              m.name AS member,
-              SUM(p.amount) AS total_payment
-            FROM Payment p
-            JOIN Member m ON p.member_id = m.member_id
-            GROUP BY m.name;
+          INSERT INTO Member (name, phone, gender, join_date, expiry_date, remaining_pt_count)
+            VALUES ('홍길동', '010-0000-0001', 'M', CURRENT_DATE, CURRENT_DATE + 365, 10);
+
+          INSERT INTO PT_Session (member_id, trainer_id, session_date, session_time)
+          SELECT m.member_id, t.trainer_id, CURRENT_DATE + 1, '10:00'
+          FROM Member m, Trainer t
+          WHERE m.phone = '010-0000-0001' AND t.name = '김트레이너';
+
+          SELECT m.name AS member, t.name AS trainer, s.session_date, s.session_time, s.status
+          FROM PT_Session s
+          JOIN Member m ON s.member_id = m.member_id
+          JOIN Trainer t ON s.trainer_id = t.trainer_id
+          ORDER BY s.session_id DESC LIMIT 5;
+
+          SELECT m.name AS member, SUM(p.amount) AS total_payment
+          FROM Payment p
+          JOIN Member m ON p.member_id = m.member_id
+          GROUP BY m.name
+          ORDER BY total_payment DESC;
           SQL
+
+      - name: Verify — 제약 위반은 거부되어야 함
+        run: |
+          assert_rejected() {
+            if psql -v ON_ERROR_STOP=1 -q -c "$1" >/dev/null 2>&1; then
+              echo "::error::허용되면 안 되는 SQL 이 통과했습니다 — $2"
+              exit 1
+            fi
+            echo "거부됨(정상): $2"
+          }
+
+          assert_rejected \
+            "INSERT INTO PT_Session (member_id, trainer_id, session_date, session_time)
+             SELECT 1, 1, CURRENT_DATE, '99:99'" \
+            "존재하지 않는 시각 99:99"
+
+          assert_rejected \
+            "INSERT INTO Member (name, phone, gender, join_date, expiry_date)
+             VALUES ('중복', '010-1111-2221', 'M', CURRENT_DATE, CURRENT_DATE)" \
+            "전화번호 중복"
+
+          assert_rejected \
+            "INSERT INTO Member (name, phone, gender, join_date, expiry_date, remaining_pt_count)
+             VALUES ('음수', '010-0000-9999', 'M', CURRENT_DATE, CURRENT_DATE, -1)" \
+            "잔여 PT 횟수 음수"
+
+          assert_rejected \
+            "INSERT INTO PT_Session (member_id, trainer_id, session_date, session_time, status)
+             SELECT s.member_id, s.trainer_id, s.session_date, s.session_time, 'SCHEDULED'
+             FROM PT_Session s WHERE s.status = 'SCHEDULED' LIMIT 1" \
+            "같은 트레이너·시간대 중복 예약"
+
+          assert_rejected \
+            "INSERT INTO Payment (member_id, amount, method, category)
+             VALUES (1, -1000, 'Card', 'PT')" \
+            "결제 금액 음수"

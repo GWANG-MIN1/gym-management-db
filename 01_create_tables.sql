@@ -78,8 +78,8 @@ CREATE TABLE Workout_Log (
     reps NUMBER NOT NULL CHECK (reps > 0),
     feedback VARCHAR2(200),
     created_at DATE DEFAULT SYSDATE,
-    FOREIGN KEY (member_id) REFERENCES Member(member_id) ON DELETE CASCADE,
-    FOREIGN KEY (exercise_id) REFERENCES Exercise(exercise_id)
+    FOREIGN KEY (member_id) REFERENCES Member (member_id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES Exercise (exercise_id)
 );
 
 ---------------------------------------------------------
@@ -93,17 +93,17 @@ CREATE TABLE Payment (
     method VARCHAR2(20) NOT NULL CHECK (method IN ('Card', 'Cash', 'Transfer')),
     category VARCHAR2(20) NOT NULL CHECK (category IN ('PT', 'Membership', 'Visit')),
     created_at DATE DEFAULT SYSDATE,
-    FOREIGN KEY (member_id) REFERENCES Member(member_id) ON DELETE CASCADE
+    FOREIGN KEY (member_id) REFERENCES Member (member_id) ON DELETE CASCADE
 );
 
 ---------------------------------------------------------
 -- Indexes
 ---------------------------------------------------------
-CREATE INDEX idx_pt_session_member ON PT_Session(member_id);
-CREATE INDEX idx_pt_session_date ON PT_Session(session_date);
-CREATE INDEX idx_workout_member ON Workout_Log(member_id);
-CREATE INDEX idx_workout_date ON Workout_Log(log_date);
-CREATE INDEX idx_payment_member ON Payment(member_id);
+CREATE INDEX idx_pt_session_member ON PT_Session (member_id);
+CREATE INDEX idx_pt_session_date ON PT_Session (session_date);
+CREATE INDEX idx_workout_member ON Workout_Log (member_id);
+CREATE INDEX idx_workout_date ON Workout_Log (log_date);
+CREATE INDEX idx_payment_member ON Payment (member_id);
 CREATE INDEX idx_member_expiry ON Member (expiry_date);
 
 ---------------------------------------------------------

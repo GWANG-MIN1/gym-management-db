@@ -1,0 +1,8 @@
+# sql/ 아래는 PostgreSQL 용 스크립트 (루트 .sqlfluff 는 Oracle 기준)
+# exclude_rules 는 상위 설정을 병합하지 않고 덮어쓰므로 루트 목록을 함께 적는다.
+[sqlfluff]
+dialect = postgres
+# 루트와 동일: RF05, LT05, CP02, AM05
+# LT01: 컬럼 정의를 세로로 맞춰 쓰는 스타일 유지
+# RF04: name / sets / reps / method 등 업무상 자연스러운 컬럼명 사용
+exclude_rules = RF05, LT05, CP02, AM05, LT01, RF04

@@ -48,9 +48,9 @@ SELECT
 FROM Workout_Log AS W
 JOIN Exercise AS E ON W.exercise_id = E.exercise_id
 WHERE W.member_id = (
-    SELECT member_id
-    FROM Member
-    WHERE name = 'Kim Cheol-Su'
+    SELECT M.member_id
+    FROM Member AS M
+    WHERE M.name = 'Kim Cheol-Su'
 )
 AND W.log_date >= SYSDATE - 30;
 
@@ -92,8 +92,9 @@ SELECT
     COUNT(DISTINCT S.member_id) AS total_members
 FROM Trainer AS T
 LEFT JOIN PT_Session AS S
-ON T.trainer_id = S.trainer_id
-    AND S.status = 'COMPLETED'
+    ON
+        T.trainer_id = S.trainer_id
+        AND S.status = 'COMPLETED'
 GROUP BY T.trainer_id, T.name, T.specialty
 ORDER BY completed_sessions DESC;
 
@@ -107,6 +108,7 @@ SELECT
     expiry_date,
     remaining_pt_count
 FROM Member
-WHERE remaining_pt_count <= 3
+WHERE
+    remaining_pt_count <= 3
     AND expiry_date >= SYSDATE
 ORDER BY remaining_pt_count ASC, expiry_date ASC;

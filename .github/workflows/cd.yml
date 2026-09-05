@@ -13,9 +13,16 @@ env:
   ECR_REPOSITORY: gym-mgmt-dev-api
 
 jobs:
+  # 배포 전에 API 테스트를 먼저 통과해야 한다.
+  # (빌드·헬스체크만으로는 업무 로직이 깨진 이미지도 그대로 배포된다)
+  test:
+    name: API Test
+    uses: ./.github/workflows/api-test.yml
+
   build-and-push:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
+    needs: test
     outputs:
       image: ${{ steps.build.outputs.image }}
 
@@ -85,6 +92,8 @@ jobs:
               "$IMAGE"
 
             # 헬스체크 (최대 30초 대기)
+            # /health 는 DB 에 SELECT 1 을 던져 확인하므로, DB 연결이 끊긴 컨테이너는
+            # 여기서 걸러진다
             for i in $(seq 1 6); do
               sleep 5
               if curl -sf http://localhost:8000/health; then
