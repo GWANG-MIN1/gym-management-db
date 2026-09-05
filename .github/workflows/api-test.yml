@@ -19,7 +19,8 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: gymdb
+          # 테스트는 테이블을 삭제·재생성하므로 전용 DB 를 쓴다
+          POSTGRES_DB: gymdb_test
           POSTGRES_USER: gymadmin
           POSTGRES_PASSWORD: testpassword
         ports:
@@ -31,8 +32,9 @@ jobs:
           --health-retries 5
 
     env:
-      # CHECK 정규식·부분 유니크 인덱스가 PostgreSQL 전용이라 실제 DB 로 테스트한다
-      DATABASE_URL: postgresql://gymadmin:testpassword@localhost:5432/gymdb
+      # CHECK 정규식·부분 유니크 인덱스가 PostgreSQL 전용이라 실제 DB 로 테스트한다.
+      # conftest 는 TEST_DATABASE_URL 만 받고, 이름이 _test 로 끝나지 않으면 실행을 거부한다.
+      TEST_DATABASE_URL: postgresql://gymadmin:testpassword@localhost:5432/gymdb_test
 
     steps:
       - name: Checkout

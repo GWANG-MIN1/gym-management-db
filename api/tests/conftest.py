@@ -2,12 +2,17 @@
 
 PostgreSQL 에 붙어서 실행합니다(CHECK 정규식·부분 유니크 인덱스가 PostgreSQL 전용).
 
+**테스트는 테이블을 삭제·재생성합니다.** 개발용 DB 를 지우지 않도록
+접속 정보는 TEST_DATABASE_URL 로만 받고, DB 이름이 `_test` 로 끝나지 않으면 실행을 거부합니다.
+
   docker compose up -d db
-  DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb pytest
+  docker compose exec -T db psql -U gymadmin -d gymdb -c "CREATE DATABASE gymdb_test"
+  cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb_test pytest -q
 """
 
 import os
 from datetime import date, timedelta
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -15,12 +20,27 @@ import pytest
 os.environ.pop("API_KEY", None)
 os.environ.pop("READ_DATABASE_URL", None)
 
-_DB_URL = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
+_TEST_DB_SUFFIX = "_test"
+_USAGE = (
+    "  docker compose exec -T db psql -U gymadmin -d gymdb -c \"CREATE DATABASE gymdb_test\"\n"
+    "  cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb_test pytest"
+)
+
+# DATABASE_URL 은 일부러 쓰지 않는다 — 개발용 DB 를 가리키고 있을 때
+# drop_all() 로 데이터를 지우는 사고를 막기 위해서다.
+_DB_URL = os.environ.get("TEST_DATABASE_URL")
 if not _DB_URL:
     raise RuntimeError(
-        "테스트에는 PostgreSQL 접속 정보가 필요합니다. "
-        "TEST_DATABASE_URL 또는 DATABASE_URL 환경변수를 설정하세요."
+        "테스트는 전용 DB 에서만 실행합니다. TEST_DATABASE_URL 을 설정하세요.\n" + _USAGE
     )
+
+_DB_NAME = urlsplit(_DB_URL).path.lstrip("/")
+if not _DB_NAME.endswith(_TEST_DB_SUFFIX):
+    raise RuntimeError(
+        f"테스트는 테이블을 삭제·재생성하므로 '{_TEST_DB_SUFFIX}' 로 끝나는 전용 DB 에서만 "
+        f"실행합니다. 지정된 DB: '{_DB_NAME}'\n" + _USAGE
+    )
+
 os.environ["DATABASE_URL"] = _DB_URL
 
 from fastapi.testclient import TestClient  # noqa: E402
