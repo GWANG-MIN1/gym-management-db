@@ -1,6 +1,11 @@
 ---------------------------------------------------------
 -- 02_insert_sample_data.sql
 -- Sample data for Gym Management Database Project
+--
+-- [Oracle XE 전용] SYSDATE 와 PK 직접 지정을 사용하므로
+-- PostgreSQL 에는 그대로 적용되지 않습니다.
+-- PostgreSQL 용 샘플 데이터는 sql/02_insert_sample_data_pg.sql 을 사용하세요
+-- (docker compose up 시 자동 적재).
 ---------------------------------------------------------
 
 ---------------------------------------------------------

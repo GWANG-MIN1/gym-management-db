@@ -10,7 +10,9 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # initdb.d 는 파일명 순서대로 실행 — 스키마 생성 후 샘플 데이터 적재
       - ./sql/01_create_tables_pg.sql:/docker-entrypoint-initdb.d/01_create_tables_pg.sql
+      - ./sql/02_insert_sample_data_pg.sql:/docker-entrypoint-initdb.d/02_insert_sample_data_pg.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gymadmin -d gymdb"]
       interval: 10s
