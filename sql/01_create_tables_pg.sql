@@ -8,12 +8,13 @@
 --   REGEXP_LIKE()   → col ~ 'pattern'
 --   NUMBER PK       → INTEGER GENERATED ALWAYS AS IDENTITY
 --
--- 이 파일은 api/models.py 의 SQLAlchemy 모델과 1:1로 대응합니다.
--- (테이블 6개 / 제약 / 인덱스 동일 — 한쪽만 바뀌면 schema-test 워크플로우에서 확인)
+-- 이 파일은 api/models.py 의 SQLAlchemy 모델, api/migrations 의 마이그레이션 결과와
+-- 1:1로 대응합니다(테이블 6개 / 제약 / 인덱스 동일 — 어긋나면 api/tests 에서 잡힙니다).
+-- 로컬 docker compose 초기화용이고, 배포 환경 스키마는 마이그레이션이 적용합니다.
 --
 -- Oracle 버전에 있던 trg_pt_session_complete 트리거(PT 완료 시 잔여 횟수 차감)는
 -- 이식하지 않았습니다. 차감은 API(PATCH /sessions/{id}/complete)에서 트랜잭션으로
--- 처리하며, 트리거를 함께 두면 로컬(SQL 적용)과 AWS(ORM create_all) 환경에서
+-- 처리하며, 트리거를 함께 두면 로컬(SQL 파일로 초기화)과 배포(마이그레이션) 환경에서
 -- 차감이 두 번 일어나 결과가 달라지기 때문입니다.
 -- =============================================================
 

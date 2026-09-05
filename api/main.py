@@ -5,7 +5,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from database import READ_REPLICA_ENABLED, Base, engine, get_db
+from database import READ_REPLICA_ENABLED, get_db
+from migrate import run_migrations
 from routers import exercises, members, payments, sessions, trainers, workouts
 
 API_VERSION = "1.1.0"
@@ -13,10 +14,10 @@ API_VERSION = "1.1.0"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 빈 RDS 에서도 기동되도록 시작 시 테이블을 만든다(이미 있으면 건너뜀).
-    # models.py 가 sql/01_create_tables_pg.sql 과 같은 6개 테이블을 정의하므로
-    # 로컬(SQL 적용)과 AWS(create_all) 스키마가 같아진다.
-    Base.metadata.create_all(bind=engine)
+    # 시작 시 스키마를 최신으로 올린다.
+    # create_all() 은 '없는 테이블'만 만들 뿐 기존 테이블의 기본값·제약·인덱스를
+    # 바꾸지 못해, 예전 스키마 위에 새 버전을 올리면 등록 요청이 전부 실패했다.
+    run_migrations()
     yield
 
 

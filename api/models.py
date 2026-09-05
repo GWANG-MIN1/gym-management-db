@@ -1,8 +1,11 @@
 """SQLAlchemy ORM 모델.
 
-sql/01_create_tables_pg.sql 과 1:1로 대응합니다(테이블 6개 / 제약 / 인덱스 동일).
-AWS 환경에서는 이 정의로 create_all() 이 실행되므로, SQL 파일만 고치고 여기를
-빠뜨리면 로컬과 배포 환경의 스키마가 달라집니다. 한쪽을 바꾸면 반드시 같이 수정하세요.
+스키마 정의가 세 곳에 있고 모두 같은 결과를 내야 합니다.
+  - sql/01_create_tables_pg.sql : 로컬 docker compose 초기화
+  - 이 파일                      : ORM · 테스트
+  - api/migrations/              : 배포 시 실제 적용
+한 곳만 고치면 환경마다 스키마가 달라집니다.
+api/tests 의 test_schema_parity / test_migration_from_legacy 가 셋을 비교합니다.
 """
 
 from datetime import date
