@@ -29,7 +29,8 @@ ECR/EC2 자동 배포 → AWS Secrets Manager 보안 → CloudWatch 모니터링
 인터넷
   └─ EC2 (t3.micro, ap-northeast-2a)
        ├─ gym-api 컨테이너 (FastAPI, :8000)
-       │    └─ 시작 시 Secrets Manager 에서 DB 접속 정보 자동 로드
+       │    ├─ 시작 시 Secrets Manager 에서 DB 접속 정보 자동 로드
+       │    └─ 시작 시 Alembic 마이그레이션으로 스키마를 최신으로 정렬
        └─ Private Subnet
             └─ RDS PostgreSQL 15 (Primary)
                  └─ Read Replica (선택 — create_read_replica = true 일 때만)
@@ -82,11 +83,16 @@ DB 레벨에서 막는 것
 - PT 시간은 `00:00`~`23:59` (부분 유니크 인덱스라 취소된 예약은 슬롯을 비움)
 - 같은 트레이너 / 같은 회원의 같은 날짜·시간 중복 예약
 
-**스키마 정의는 두 곳에 있고 CI 가 둘을 비교합니다.**
-로컬은 [`sql/01_create_tables_pg.sql`](sql/01_create_tables_pg.sql) 로,
-AWS 는 [`api/models.py`](api/models.py) 의 `create_all()` 로 테이블을 만들기 때문에
-둘이 벌어지면 환경마다 스키마가 달라집니다.
-`api/tests/test_schema_parity.py` 가 컬럼·제약·인덱스를 비교해 차이를 잡습니다.
+**스키마 정의는 세 곳에 있고 CI 가 셋을 비교합니다.**
+
+| 정의 | 쓰이는 곳 |
+|------|----------|
+| [`sql/01_create_tables_pg.sql`](sql/01_create_tables_pg.sql) | 로컬 docker compose 초기화 |
+| [`api/models.py`](api/models.py) | ORM · 테스트 |
+| [`api/migrations/`](api/migrations) | 배포 시 실제 적용 (Alembic) |
+
+셋이 벌어지면 환경마다 스키마가 달라지므로, `test_schema_parity.py` 가 SQL ↔ ORM 을,
+`test_migration_from_legacy.py` 가 마이그레이션 결과 ↔ ORM 을 컬럼·제약·인덱스 단위로 비교합니다.
 
 > Oracle 용 루트 SQL 3개(`01_create_tables.sql`, `02_insert_sample_data.sql`,
 > `03_project_queries.sql`)는 초기 버전의 기록입니다. 현재 서비스는 PostgreSQL 만 사용하며,
@@ -135,7 +141,7 @@ Swagger UI: `http://<EC2_IP>:8000/docs`
 
 **잔여 PT 횟수 차감**은 Oracle 스키마에서 트리거(`trg_pt_session_complete`)로 하던 일인데,
 PostgreSQL 로 옮기면서 API 의 완료 처리로 옮겼습니다.
-트리거를 함께 두면 로컬(SQL 적용)과 AWS(`create_all`) 환경에서 차감이 두 번 일어나기 때문입니다.
+트리거를 함께 두면 로컬(SQL 파일로 초기화)과 배포(마이그레이션) 환경에서 차감이 두 번 일어나기 때문입니다.
 차감은 상태 변경과 같은 트랜잭션에서 `remaining_pt_count > 0` 조건부 UPDATE 로 처리하며,
 남은 횟수가 없으면 완료 처리 자체가 409 로 거부됩니다.
 
@@ -177,10 +183,15 @@ docker compose up -d
 
 PostgreSQL 전용 제약(정규식 CHECK, 부분 유니크 인덱스)을 쓰므로 실제 PostgreSQL 에 붙여 실행합니다.
 
+> **테스트는 테이블을 삭제·재생성합니다.** 그래서 접속 정보는 `TEST_DATABASE_URL` 로만 받고,
+> DB 이름이 `_test` 로 끝나지 않으면 실행을 거부합니다. 개발용 `gymdb` 를 지우지 않기 위한 장치입니다.
+> 업그레이드 테스트는 `<DB이름>_legacy` DB 를 잠시 만들었다 지우므로 계정에 DB 생성 권한이 필요합니다.
+
 ```bash
 docker compose up -d db
+docker compose exec -T db psql -U gymadmin -d gymdb -c "CREATE DATABASE gymdb_test"   # 최초 1회
 pip install -r api/requirements-dev.txt
-cd api && DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb pytest -q
+cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb_test pytest -q
 ```
 
 ---
@@ -209,6 +220,38 @@ api/** 코드 변경 → git push → GitHub Actions
 
 **한계:** 기존 컨테이너를 먼저 내리고 새로 띄우므로 배포 중 짧은 중단이 생기고,
 실패 시 이전 이미지로 자동 롤백하는 단계는 아직 없습니다.
+
+---
+
+## 스키마 마이그레이션 (Alembic)
+
+예전에는 앱 시작 시 `create_all()` 을 호출했습니다. 하지만 `create_all()` 은 **없는 테이블만
+만들 뿐 기존 테이블의 기본값·제약·인덱스는 손대지 않습니다.** 그래서 예전 스키마가 있는 DB 에
+새 버전을 배포하면 `created_at` 기본값이 없어 **회원·트레이너·예약 등록이 전부 422 로 실패**했고,
+예전의 일반 UNIQUE 제약이 남아 **취소한 예약의 시간대를 다시 쓸 수 없었습니다.**
+
+지금은 컨테이너가 시작할 때 Alembic 마이그레이션을 실행합니다.
+
+| 리비전 | 내용 |
+|--------|------|
+| `0001` | 예전 스키마(회원·트레이너·PT 3개 테이블) — 기존 DB 를 이력에 편입시키는 기준점 |
+| `0002` | 운동·운동기록·결제 테이블 추가, 기본값 부여, 예약 중복 방지 제약을 부분 유니크 인덱스로 교체, 시각 형식 CHECK·인덱스 추가, SERIAL → IDENTITY 전환 |
+
+```
+빈 DB            → 0001 → 0002
+기존 DB(이력 없음) → 0001 로 stamp → 0002 만 적용
+이미 최신 DB      → 아무것도 하지 않음
+```
+
+`0002` 는 여러 번 실행해도 안전하도록 작성했습니다. 운영 DB 가 "예전 3개 테이블 +
+`create_all` 이 만든 새 3개 테이블"처럼 섞인 상태여도 그대로 적용됩니다.
+
+새 제약을 붙이기 전에 기존 데이터를 먼저 검사해, 위반하는 행이 있으면
+(예: `99:99` 같은 시각, 같은 회원의 같은 시간대 중복 예약) **어떤 행이 문제인지 알려주고 중단**합니다.
+이때는 컨테이너가 뜨지 않아 배포가 실패하므로, 데이터를 정리한 뒤 다시 배포해야 합니다.
+
+`0002` 의 downgrade 는 제공하지 않습니다(테이블 추가와 IDENTITY 전환이 포함돼 자동 복구가
+안전하지 않음). 되돌려야 한다면 RDS 스냅샷에서 복구합니다.
 
 ---
 
@@ -317,7 +360,9 @@ gym-management-db/
 ├── api/                          FastAPI 서버
 │   ├── Dockerfile
 │   ├── requirements.txt / requirements-dev.txt
-│   ├── main.py                   앱 진입점 + 헬스체크
+│   ├── main.py                   앱 진입점 + 헬스체크 (시작 시 마이그레이션)
+│   ├── migrate.py                Alembic 실행 (기존 DB 자동 편입)
+│   ├── alembic.ini / migrations/ 스키마 마이그레이션
 │   ├── database.py               DB 연결 (Secrets Manager · 읽기/쓰기 분리)
 │   ├── models.py                 SQLAlchemy ORM 모델 (6개 테이블)
 │   ├── schemas.py                Pydantic 요청/응답 스키마
@@ -326,7 +371,7 @@ gym-management-db/
 │   ├── pagination.py             limit / offset 공통 파라미터
 │   ├── routers/                  members · trainers · exercises
 │   │                             sessions · workouts · payments
-│   └── tests/                    pytest (스키마 일치 검증 포함)
+│   └── tests/                    pytest (스키마 일치·업그레이드 검증 포함)
 │
 ├── load-test/
 │   └── k6_script.js              부하 테스트 스크립트
@@ -382,6 +427,7 @@ terraform apply
 | 데이터베이스 | PostgreSQL 15 (AWS RDS), Oracle XE 21c (초기 버전) |
 | 컨테이너 | Docker, Docker Compose |
 | 클라우드 | AWS EC2, RDS, ECR, Secrets Manager, CloudWatch, SNS, IAM |
+| 마이그레이션 | Alembic 1.13 |
 | IaC | Terraform ≥ 1.6 |
 | CI/CD | GitHub Actions |
 | 테스트 | pytest (API), k6 (부하) |
@@ -390,8 +436,6 @@ terraform apply
 
 ## 다음 단계
 
-- **마이그레이션 도구 도입** — 지금은 `create_all()` 로 없는 테이블만 만들 뿐,
-  기존 테이블의 컬럼 변경을 반영하지 못합니다. Alembic 을 붙이고 배포 단계에 넣어야 합니다.
 - 역할(관리자/트레이너/회원) 기반 권한 분리
 - 수정·삭제 엔드포인트와 무중단 배포(롤백 포함)
 - 개선 후 부하 테스트 재측정
