@@ -25,11 +25,29 @@ export const options = {
   },
 };
 
-const BASE_URL = "http://43.203.233.160:8000";
+// 대상 서버는 환경변수로 지정한다 (IP 를 코드에 박아두지 않음)
+//   k6 run -e BASE_URL=http://<EC2_IP>:8000 load-test/k6_script.js
+//   API_KEY 를 설정한 서버라면 -e API_KEY=... 도 함께 전달
+const BASE_URL = __ENV.BASE_URL || "http://localhost:8000";
+const PAGE_SIZE = __ENV.PAGE_SIZE || 50;
+
+const writeHeaders = { "Content-Type": "application/json" };
+if (__ENV.API_KEY) {
+  writeHeaders["X-API-Key"] = __ENV.API_KEY;
+}
+
+function isoDate(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function () {
-  // 1. 회원 목록 조회 (읽기 — Primary DB 쿼리)
-  const listRes = http.get(`${BASE_URL}/members`);
+  // 1. 회원 목록 조회 (읽기 — Replica 가 있으면 Replica, 없으면 Primary)
+  //    페이지네이션이 생겨 전체 행을 직렬화하지 않는다
+  const listRes = http.get(`${BASE_URL}/members?limit=${PAGE_SIZE}`, {
+    tags: { name: "GET /members" },
+  });
   listMembersDuration.add(listRes.timings.duration);
   errorRate.add(listRes.status !== 200);
   check(listRes, { "GET /members 200": (r) => r.status === 200 });
@@ -37,7 +55,9 @@ export default function () {
   sleep(0.5);
 
   // 2. 트레이너 목록 조회
-  const trainerRes = http.get(`${BASE_URL}/trainers`);
+  const trainerRes = http.get(`${BASE_URL}/trainers?limit=${PAGE_SIZE}`, {
+    tags: { name: "GET /trainers" },
+  });
   errorRate.add(trainerRes.status !== 200);
   check(trainerRes, { "GET /trainers 200": (r) => r.status === 200 });
 
@@ -51,11 +71,11 @@ export default function () {
       name: "부하테스트",
       phone: phone,
       gender: "M",
-      join_date: "2026-05-13",
-      expiry_date: "2027-05-13",
+      join_date: isoDate(0),
+      expiry_date: isoDate(365),
       remaining_pt_count: 5,
     }),
-    { headers: { "Content-Type": "application/json" } }
+    { headers: writeHeaders, tags: { name: "POST /members" } }
   );
   createMemberDuration.add(createRes.timings.duration);
   errorRate.add(createRes.status !== 201);
