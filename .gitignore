@@ -2,8 +2,21 @@
 terraform/.terraform/
 terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
-terraform/terraform.tfvars        # 패스워드 포함 — 절대 커밋 금지
+# ↓ DB 패스워드 포함 — 절대 커밋 금지
+# (주석을 같은 줄에 쓰면 패턴의 일부로 인식되어 무시되지 않으므로 반드시 별도 줄에 작성)
+terraform/terraform.tfvars
 terraform/*.tfplan
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# 로컬 환경변수
+.env
 
 # OS
 .DS_Store
