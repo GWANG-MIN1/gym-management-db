@@ -11,6 +11,9 @@ from fastapi import Query
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
+# offset 상한이 없으면 bigint 범위를 넘는 값이 DB 까지 내려가 500 이 된다.
+# 범위 안이어도 offset 이 크면 그만큼 행을 건너뛰느라 느려지므로 함께 제한한다.
+MAX_OFFSET = 100_000
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,6 @@ class Pagination:
 
 def pagination(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="한 번에 가져올 최대 건수"),
-    offset: int = Query(0, ge=0, description="건너뛸 건수"),
+    offset: int = Query(0, ge=0, le=MAX_OFFSET, description="건너뛸 건수"),
 ) -> Pagination:
     return Pagination(limit=limit, offset=offset)
