@@ -19,10 +19,16 @@ jobs:
     name: API Test
     uses: ./.github/workflows/api-test.yml
 
+  # 빌드·배포는 저장소 변수 RUN_DEPLOY 가 'true' 일 때만 실행한다.
+  # AWS 자격 증명이 없는 상태에서 매 push 마다 배포가 실패하는 것을 막기 위한 스위치로,
+  # terraform.yml 의 RUN_TERRAFORM_PLAN 과 같은 방식이다.
+  # 다시 배포하려면 Settings → Secrets and variables → Actions → Variables 에서
+  # RUN_DEPLOY = true 로 두고 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 를 채운다.
   build-and-push:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
     needs: test
+    if: ${{ vars.RUN_DEPLOY == 'true' }}
     outputs:
       image: ${{ steps.build.outputs.image }}
 
@@ -58,6 +64,7 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build-and-push
+    if: ${{ vars.RUN_DEPLOY == 'true' }}
 
     steps:
       - name: SSH into EC2 and deploy
