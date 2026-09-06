@@ -18,7 +18,6 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import sessionmaker
 
@@ -37,7 +36,9 @@ TOMORROW = TODAY + timedelta(days=1)
 @pytest.fixture
 def legacy_engine():
     """예전 스키마와 데이터가 들어 있는 별도 DB 를 만들어 준다."""
-    url = make_url(str(test_engine.url))
+    # str(URL) 은 비밀번호를 '***' 로 가린다. 그 문자열로 URL 을 다시 만들면
+    # 비밀번호가 '***' 인 접속 정보가 되어 연결에 실패하므로, URL 객체를 그대로 쓴다.
+    url = test_engine.url
     legacy_url = url.set(database=f"{url.database}_legacy")
 
     with test_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
