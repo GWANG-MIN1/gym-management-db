@@ -4,7 +4,6 @@
 
 ![SQL Lint](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/lint.yml/badge.svg)
 ![Schema Test](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/schema-test.yml/badge.svg)
-![API Test](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/api-test.yml/badge.svg)
 ![Terraform CI](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/terraform.yml/badge.svg)
 ![CD](https://github.com/GWANG-MIN1/gym-management-db/actions/workflows/cd.yml/badge.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
@@ -225,21 +224,25 @@ cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gym
 |-----------|--------|
 | `lint.yml` | sqlfluff 로 SQL 린트 — **위반이 있으면 실패** |
 | `schema-test.yml` | 스키마·샘플 데이터 적용 후 조회, 제약 위반이 실제로 거부되는지 확인 (`ON_ERROR_STOP=1`) |
-| `api-test.yml` | PostgreSQL 서비스 컨테이너에 붙여 pytest 실행 |
+| `api-test.yml` | PostgreSQL 서비스 컨테이너에 붙여 pytest 실행 (PR 에서 직접, main push 는 CD 가 호출) |
 | `terraform.yml` | `terraform fmt -check` + `validate` |
-| `cd.yml` | **API 테스트 통과 후** 빌드 → ECR → EC2 배포 → `/health` 확인 |
+| `cd.yml` | **API 테스트 통과 후** 빌드 → ECR → EC2 배포 → `/health` 확인 (빌드·배포는 `RUN_DEPLOY == 'true'` 일 때만) |
 
 ```
 api/** 코드 변경 → git push → GitHub Actions
-  ├─ test (pytest + PostgreSQL)
-  ├─ build-and-push
+  ├─ test (pytest + PostgreSQL)          ← 항상 실행
+  ├─ build-and-push                      ← RUN_DEPLOY = true 일 때만
   │    ├─ Docker 이미지 빌드
   │    └─ ECR push (SHA 태그 + latest)
-  └─ deploy
+  └─ deploy                              ← RUN_DEPLOY = true 일 때만
        ├─ EC2 SSH 접속
        ├─ docker pull → 기존 컨테이너 교체
        └─ /health (DB SELECT 1 포함) 통과 확인
 ```
+
+**배포 스위치:** AWS 인프라를 내린 상태에서도 테스트는 계속 돌아야 하므로,
+빌드·배포는 저장소 변수 `RUN_DEPLOY` 로 켜고 끕니다(`terraform.yml` 의 `RUN_TERRAFORM_PLAN` 과 같은 방식).
+변수가 없으면 테스트만 실행되고 빌드·배포는 건너뜁니다.
 
 **한계:** 기존 컨테이너를 먼저 내리고 새로 띄우므로 배포 중 짧은 중단이 생기고,
 실패 시 이전 이미지로 자동 롤백하는 단계는 아직 없습니다.
@@ -466,6 +469,12 @@ terraform apply
 | `AWS_SECRET_ACCESS_KEY` | IAM Secret Key |
 | `EC2_HOST` | `terraform output ec2_public_ip` |
 | `EC2_SSH_KEY` | `.pem` 파일 전체 내용 |
+
+**저장소 변수 (Settings → Secrets and variables → Actions → Variables):**
+
+| 변수 | 값 | 설명 |
+|------|----|------|
+| `RUN_DEPLOY` | `true` | 이 값이 있어야 CD 가 빌드·배포까지 진행합니다 |
 
 ---
 
