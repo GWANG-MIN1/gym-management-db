@@ -204,7 +204,7 @@ pip install -r api/requirements-dev.txt
 cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gymdb_test pytest -q
 ```
 
-테스트 45개가 확인하는 것
+테스트 56개가 확인하는 것
 
 | 파일 | 확인하는 것 |
 |------|------------|
@@ -213,6 +213,7 @@ cd api && TEST_DATABASE_URL=postgresql://gymadmin:gymadmin123@localhost:5433/gym
 | `test_workouts_payments.py` | 운동 기록·결제 등록과 필터, FK 위반 404 |
 | `test_auth.py` | `API_KEY` 설정 여부에 따른 쓰기 요청 인증 |
 | `test_health.py` | `/health` 의 DB 확인, `/health/live` |
+| `test_input_limits.py` | 숫자 입력 상한 — 범위를 넘는 값이 500 대신 422 로 거절되는지 |
 | `test_schema_parity.py` | SQL 스키마 ↔ ORM 모델의 컬럼·제약·인덱스 일치 |
 | `test_migration_from_legacy.py` | 예전 스키마 DB 가 현재 버전으로 업그레이드되는지 (아래 참고) |
 
@@ -392,6 +393,10 @@ create_read_replica = true
 `create_read_replica = true` 면 Terraform 이 Secrets Manager 시크릿에 `replica_host` 를 추가하고,
 API 는 그 값이 있을 때만 읽기 세션(`get_read_db`)을 Replica 로 연결합니다.
 로컬에서는 `READ_DATABASE_URL` 환경변수로 같은 동작을 시험할 수 있습니다.
+
+**한계:** `/health` 는 Primary 에만 `SELECT 1` 을 던집니다. Replica 가 끊겨도 헬스체크는
+200 이고, 그 상태에서 목록 조회만 실패합니다. Replica 를 실제로 운영한다면 헬스체크에
+읽기 커넥션 확인을 추가하고 Replica 장애 시 Primary 로 넘어가는 처리가 필요합니다.
 
 > `multi_az`, `create_read_replica`, `storage_encrypted` 세 옵션은 **기본값이 모두 `false`** 입니다.
 > 코드에 옵션이 있다는 것과 현재 켜져 있다는 것은 다릅니다.
